@@ -22,29 +22,29 @@ const int CMD_SIZE = 10;
 
 enum ASM_CMD
 {
-    HLT     ,
+    HLT     , //  0
 
-    PUSH    ,
-    POP     ,
+    PUSH    , //  1
+    POP     , //  2
 
-    JMP     ,
-    JA      ,
-    JAE     ,
-    JB      ,
-    JBE     ,
-    JE      ,
-    JNE     ,
+    JMP     , //  3
+    JA      , //  4
+    JAE     , //  5
+    JB      , //  6
+    JBE     , //  7
+    JE      , //  8
+    JNE     , //  9
 
-    CALL    ,
-    RET     ,
+    CALL    , // 10
+    RET     , // 11
 
-    ADD     ,
-    SUB     ,
-    MUL     ,
-    DIV     ,
-    POW     ,
+    ADD     , // 12
+    SUB     , // 13
+    MUL     , // 14
+    DIV     , // 15
+    POW     , // 16
 
-    UNDEF   ,
+    UNDEF   , // 17
 };
 
 enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         4 bit         |
@@ -89,6 +89,7 @@ bool assembler              (const char *assembler_buff, const int buff_size, cp
 
 void get_source_word        (char *const buff, source_cmd *const code_store);
 void skip_source_undef_cmd  (source_cmd *const code_store);
+void skip_source_word       (source_cmd *const code_store);
 void skip_source_spaces     (source_cmd *const code_store);
 
 /*_____________________________________________________________________________*/
@@ -109,9 +110,10 @@ int main(const int argc, const char *argv[])
         return 0;
     }
 
-    FILE *execute_file = fopen(argv[2], "r");
+    FILE *execute_file = fopen(argv[2], "w");
     if   (execute_file == nullptr)
     {
+        log_free(assembler_buff);
         fprintf(stderr, "can't open \"%s\"\n", argv[2]);
         return 0;
     }
@@ -184,6 +186,12 @@ bool assembler(const char *assembler_buff, const int buff_size, cpu_cmd *const c
 
 bool parse_general(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store)
 {
+    log_header(__PRETTY_FUNCTION__);
+
+    log_message("\"");
+    for (int i = 0; i < code_size; ++i) log_message("%c", code[i]);
+    log_message("\"\n\n");
+
     assert(code_store != nullptr);
     assert(cmd_store  != nullptr);
     assert(tag_store  != nullptr);
@@ -193,30 +201,39 @@ bool parse_general(source_cmd *const code_store, cpu_cmd *const cmd_store, label
     {
         if (code[code_pos] == '\0') break;
 
-        ASM_CMD cur_cmd = define_cmd(code_store);
+        ASM_CMD cur_cmd     = define_cmd(code_store);
+        bool    cur_status  = true;
+
+        log_message("line %d. cur_cmd = %d\n\n", code_line, cur_cmd);
+
         switch (cur_cmd)
         {
-            case PUSH: err = (err == true) ? err : parse_push(code_store, cmd_store); break;
-            case POP : err = (err == true) ? err : parse_pop (code_store, cmd_store); break;
+            case PUSH: cur_status = !parse_push(code_store, cmd_store); break;
+            case POP : cur_status = !parse_pop (code_store, cmd_store); break;
             
             case  JA : case JB : case JE :
             case  JAE: case JBE: case JNE:
-            case  JMP: err = (err == true) ? err : parse_jump(code_store, cmd_store, tag_store, cur_cmd); break;
+            case  JMP: cur_status = !parse_jump(code_store, cmd_store, tag_store, cur_cmd); break;
 
-            case CALL: err = (err == true) ? err : parse_call(code_store, cmd_store, tag_store); break;
-            case RET : err = (err == true) ? err : parse_ret (cmd_store);                        break;
+            case CALL: cur_status = !parse_call(code_store, cmd_store, tag_store); break;
+            case RET : cur_status = !parse_ret (cmd_store);                        break;
 
             case ADD : case SUB:
             case MUL : case DIV:
             case POW :
-            case HLT : err = (err == true) ? err : parse_operators(cmd_store, cur_cmd); break;
+            case HLT : cur_status = !parse_operators(cmd_store, cur_cmd); break;
 
-            case UNDEF:err = (err == true) ? err : parse_label(code_store, cmd_store, tag_store); break;
+            case UNDEF:cur_status = !parse_label(code_store, cmd_store, tag_store); break;
 
             default: assert(false && "default case in parse_general() switch"); break;
         }
+
+        err = (err == true) ? true : cur_status;
+        skip_source_spaces(code_store);
     }
 
+    log_message("err = %d\n", err);
+    log_end_header();
     return err == false;
 }
 
@@ -227,30 +244,32 @@ ASM_CMD define_cmd(source_cmd *const code_store)
     skip_source_spaces(code_store);
 
     int code_pos_before = code_pos;
+    log_message("code_pos_before = %d\n", code_pos_before);
+
     char cmd[CMD_SIZE] = {};
     get_source_word(cmd, code_store);
 
-    if (!strcasecmp("hlt" , code)) { return HLT ;}
+    if (!strcasecmp("hlt" , cmd)) return HLT ;
 
-    if (!strcasecmp("push", code)) { return PUSH; }
-    if (!strcasecmp("pop" , code)) { return POP ; }
+    if (!strcasecmp("push", cmd)) return PUSH;
+    if (!strcasecmp("pop" , cmd)) return POP ;
     
-    if (!strcasecmp("jmp" , code)) { return JMP ; }
-    if (!strcasecmp("ja"  , code)) { return JA  ; }
-    if (!strcasecmp("jae" , code)) { return JAE ; }
-    if (!strcasecmp("jb"  , code)) { return JB  ; }
-    if (!strcasecmp("jbe" , code)) { return JBE ; }
-    if (!strcasecmp("je"  , code)) { return JE  ; }
-    if (!strcasecmp("jne" , code)) { return JNE ; }
-    
-    if (!strcasecmp("call", code)) { return CALL; }
-    if (!strcasecmp("ret" , code)) { return RET ; }
+    if (!strcasecmp("jmp" , cmd)) return JMP ;
+    if (!strcasecmp("ja"  , cmd)) return JA  ;
+    if (!strcasecmp("jae" , cmd)) return JAE ; 
+    if (!strcasecmp("jb"  , cmd)) return JB  ;
+    if (!strcasecmp("jbe" , cmd)) return JBE ; 
+    if (!strcasecmp("je"  , cmd)) return JE  ;
+    if (!strcasecmp("jne" , cmd)) return JNE ;
 
-    if (!strcasecmp("add" , code)) { return ADD ; }
-    if (!strcasecmp("sub" , code)) { return SUB ; }
-    if (!strcasecmp("mul" , code)) { return MUL ; }
-    if (!strcasecmp("div" , code)) { return DIV ; }
-    if (!strcasecmp("pow" , code)) { return POW ; }
+    if (!strcasecmp("call", cmd)) return CALL;
+    if (!strcasecmp("ret" , cmd)) return RET ;
+
+    if (!strcasecmp("add" , cmd)) return ADD ;
+    if (!strcasecmp("sub" , cmd)) return SUB ;
+    if (!strcasecmp("mul" , cmd)) return MUL ;
+    if (!strcasecmp("div" , cmd)) return DIV ;
+    if (!strcasecmp("pow" , cmd)) return POW ;
 
     code_pos = code_pos_before;
     return UNDEF;
@@ -311,7 +330,13 @@ bool parse_label(source_cmd *const code_store, cpu_cmd *const cmd_store, label *
         return false;
     }
 
-    label_push(tag_store, code + code_pos, cmd_store->pc);
+    label_push(tag_store, code + code_pos_before, cmd_store->pc);
+    log_message("new tag: \"");
+    for (int i = 0; i < tag_store->data[tag_store->size - 1].name_size; ++i)
+    {
+        log_message("%c", tag_store->data[tag_store->size - 1].name[i]);
+    }
+    log_message("\"\n");
     return true;
 }
 
@@ -347,6 +372,8 @@ bool parse_pop(source_cmd *const code_store, cpu_cmd *const cmd_store)
     }
     if (cpu_reg_arg(code_store, cmd_store, POP)) return true;
 
+    int code_pos_before = code_pos;
+
     char arg_void[CMD_SIZE] = {};
     get_source_word(arg_void, code_store);
 
@@ -359,6 +386,9 @@ bool parse_pop(source_cmd *const code_store, cpu_cmd *const cmd_store)
     }
 
     fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "undefined pop-argument\n", code_line);
+    
+    code_pos = code_pos_before;
+    skip_source_word(code_store);
     return false;
 }
 
@@ -382,6 +412,7 @@ unsigned char parse_expretion(source_cmd *const code_store, int *const int_arg, 
             else
             {
                 fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "undefined name of register\n", code_line);
+                skip_source_word(code_store);
                 return 0;
             }
         }
@@ -399,6 +430,7 @@ unsigned char parse_expretion(source_cmd *const code_store, int *const int_arg, 
             else
             {
                 fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "undefined int\n", code_line);
+                skip_source_word(code_store);
                 return 0;
             }
         }
@@ -406,6 +438,7 @@ unsigned char parse_expretion(source_cmd *const code_store, int *const int_arg, 
     }
 
     fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "undefined name of register or int\n", code_line);
+    skip_source_word(code_store);
     return 0;
 }
 
@@ -470,10 +503,12 @@ bool cpu_call_jump(source_cmd *const code_store, cpu_cmd *const cmd_store, label
         add_cpu_cmd(cmd_store, &cmd,         sizeof(unsigned char));
         add_cpu_cmd(cmd_store, &tag_address, sizeof(int));
 
+        skip_source_word(code_store);
         return true;
     }
 
     fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "undefined tag\n", code_line);
+    skip_source_word(code_store);
     return false;
 }
 
@@ -564,6 +599,15 @@ void get_source_word(char *const buff, source_cmd *const code_store)
         buff[i] =   code[code_pos++];
     }
     buff[i] = '\0';
+}
+
+void skip_source_word(source_cmd *const code_store)
+{
+    assert(code_store != nullptr);
+
+    skip_source_spaces(code_store);
+
+    while (code_pos < code_size && !isspace(code[code_pos])) ++code_pos;
 }
 
 void skip_source_undef_cmd(source_cmd *const code_store)
