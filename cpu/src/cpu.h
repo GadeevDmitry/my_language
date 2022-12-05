@@ -1,6 +1,10 @@
 #ifndef CPU
 #define CPU
 
+typedef int cpu_type;
+const   int RAM_SIZE   = 10000;
+const   int REG_NUMBER = 8;
+
 struct cpu_cmd  // struct cpu_cmd to store information about cpu commands
 {
     void *data; // array with commands
@@ -16,6 +20,15 @@ struct source_cmd           // struct source_cmd to store information about sour
     int         code_line;  // current line in .code
 };
 
+struct cpu
+{
+    cpu_type  ram[RAM_SIZE];
+    int       reg[REG_NUMBER + 1];
+
+    stack     stk_data;
+    stack     stk_calls;
+};
+
 enum REGISTER
 {
     ERR_REG ,
@@ -28,6 +41,43 @@ enum REGISTER
     RFX     ,
     RGX     ,
     RHX     ,
+};
+
+enum ASM_CMD
+{
+    HLT     , //  0
+
+    IN      ,
+    OUT     ,
+
+    PUSH    , //  1
+    POP     , //  2
+
+    JMP     , //  3
+    JA      , //  4
+    JAE     , //  5
+    JB      , //  6
+    JBE     , //  7
+    JE      , //  8
+    JNE     , //  9
+
+    CALL    , // 10
+    RET     , // 11
+
+    ADD     , // 12
+    SUB     , // 13
+    MUL     , // 14
+    DIV     , // 15
+    POW     , // 16
+
+    UNDEF   , // 17
+};
+
+enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         4 bit         |
+{                       //----------------+-----------+-----------+-----------------------+----
+    PARAM_INT = 5   ,   //    | PARAM_MEM | PARAM_REG | PARAM_INT |        ASM_CMD        |
+    PARAM_REG = 6   ,   //----------------+-----------+-----------+-----------------------+----
+    PARAM_MEM = 7   ,
 };
 
 void add_cpu_cmd    (cpu_cmd    *const  cmd_store, const void *cmd,       const size_t    cmd_size);

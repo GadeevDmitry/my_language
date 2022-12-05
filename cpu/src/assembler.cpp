@@ -15,46 +15,7 @@
 #include "cpu.h"
 #include "terminal_colors.h"
 
-typedef int cpu_type;
-
 const int CMD_SIZE = 10;
-
-enum ASM_CMD
-{
-    HLT     , //  0
-
-    IN      ,
-    OUT     ,
-
-    PUSH    , //  1
-    POP     , //  2
-
-    JMP     , //  3
-    JA      , //  4
-    JAE     , //  5
-    JB      , //  6
-    JBE     , //  7
-    JE      , //  8
-    JNE     , //  9
-
-    CALL    , // 10
-    RET     , // 11
-
-    ADD     , // 12
-    SUB     , // 13
-    MUL     , // 14
-    DIV     , // 15
-    POW     , // 16
-
-    UNDEF   , // 17
-};
-
-enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         4 bit         |
-{                       //----------------+-----------+-----------+-----------------------+----
-    PARAM_INT = 5   ,   //    | PARAM_MEM | PARAM_REG | PARAM_INT |        ASM_CMD        |
-    PARAM_REG = 6   ,   //----------------+-----------+-----------+-----------------------+----
-    PARAM_MEM = 7   ,
-};
 
 /*_________________________________PARSERS_________________________________*/
 
@@ -493,7 +454,7 @@ bool parse_reg(source_cmd *const code_store, REGISTER *const ret)
         tolower(code[code_pos + 2]) == 'x') *ret = (REGISTER) (code[code_pos + 1] - 'a' + 1);
     else                                     err = true;
 
-    if (err == true || *ret <= 0 || *ret > 8) { *ret = ERR_REG; return false; }
+    if (err == true || *ret <= 0 || *ret > REG_NUMBER) { *ret = ERR_REG; return false; }
 
     code_pos += 3;
     return true;
