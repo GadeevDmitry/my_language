@@ -13,7 +13,6 @@
 
 #include "../../lib/label/label.h"
 #include "cpu.h"
-#include "dsl.h"
 #include "terminal_colors.h"
 
 typedef int cpu_type;
@@ -57,13 +56,13 @@ enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         4 bi
 /*_________________________________PARSERS_________________________________*/
 
 ASM_CMD         define_cmd      (source_cmd *const code_store);
-bool            parse_general   (source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store);
+bool            parse_general   (source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, int asm_num);
 
 bool            parse_operators (cpu_cmd    *const  cmd_store, ASM_CMD cmd_asm);
-bool            parse_call      (source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store);
+bool            parse_call      (source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, int asm_num);
 bool            parse_ret       (                              cpu_cmd *const cmd_store                        );
 
-bool            parse_jump      (source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, ASM_CMD cmd_asm);
+bool            parse_jump      (source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, ASM_CMD cmd_asm, int asm_num);
 bool            parse_label     (source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store);
 
 bool            parse_push      (source_cmd *const code_store, cpu_cmd *const cmd_store);
@@ -76,7 +75,7 @@ bool            parse_reg       (source_cmd *const code_store, REGISTER *const r
 /*_________________________________TRANSLATORS_________________________________*/
 
 bool cpu_operators  (                              cpu_cmd *const cmd_store,                         ASM_CMD cmd_asm);
-bool cpu_call_jump  (source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, ASM_CMD cmd_asm);
+bool cpu_call_jump  (source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, ASM_CMD cmd_asm, int asm_num);
 bool cpu_ret        (                              cpu_cmd *const cmd_store                                         );
 
 bool cpu_expretion  (source_cmd *const code_store, cpu_cmd *const cmd_store, ASM_CMD cmd_asm);
@@ -176,7 +175,15 @@ bool assembler(const char *assembler_buff, const int buff_size, cpu_cmd *const c
     label tag_store = {};
     label_ctor(&tag_store);
 
-    if (!parse_general(&code_store, cmd_store, &tag_store)) {label_dtor(&tag_store); return false; }
+    int asm_num = 0;
+    if (!parse_general(&code_store, cmd_store, &tag_store, asm_num++)) { label_dtor(&tag_store); return false; }
+    
+    code_store.code_line = 1;
+    code_store.code_pos  = 0;
+
+    cmd_store->pc = 0;
+
+    if (!parse_general(&code_store, cmd_store, &tag_store, asm_num++)) { label_dtor(&tag_store); return false; }
 
     label_dtor(&tag_store);
     return true;
@@ -184,7 +191,9 @@ bool assembler(const char *assembler_buff, const int buff_size, cpu_cmd *const c
 
 /*_________________________________PARSERS_________________________________*/
 
-bool parse_general(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store)
+#include "dsl.h"
+
+bool parse_general(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, int asm_num)
 {
     log_header(__PRETTY_FUNCTION__);
 
@@ -213,9 +222,9 @@ bool parse_general(source_cmd *const code_store, cpu_cmd *const cmd_store, label
             
             case  JA : case JB : case JE :
             case  JAE: case JBE: case JNE:
-            case  JMP: cur_status = !parse_jump(code_store, cmd_store, tag_store, cur_cmd); break;
+            case  JMP: cur_status = !parse_jump(code_store, cmd_store, tag_store, cur_cmd, asm_num); break;
 
-            case CALL: cur_status = !parse_call(code_store, cmd_store, tag_store); break;
+            case CALL: cur_status = !parse_call(code_store, cmd_store, tag_store, asm_num); break;
             case RET : cur_status = !parse_ret (cmd_store);                        break;
 
             case ADD : case SUB:
@@ -282,13 +291,13 @@ bool parse_operators(cpu_cmd *const cmd_store, ASM_CMD cmd_asm)
     return cpu_operators(cmd_store, cmd_asm);
 }
 
-bool parse_call(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store)
+bool parse_call(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, int asm_num)
 {
     assert(code_store != nullptr);
     assert(cmd_store  != nullptr);
     assert(tag_store  != nullptr);
 
-    return cpu_call_jump(code_store, cmd_store, tag_store, CALL);
+    return cpu_call_jump(code_store, cmd_store, tag_store, CALL, asm_num);
 }
 
 bool parse_ret(cpu_cmd *const cmd_store)
@@ -298,13 +307,13 @@ bool parse_ret(cpu_cmd *const cmd_store)
     return cpu_ret(cmd_store);
 }
 
-bool parse_jump(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, ASM_CMD cmd_asm)
+bool parse_jump(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, ASM_CMD cmd_asm, int asm_num)
 {
     assert(code_store != nullptr);
     assert(cmd_store  != nullptr);
     assert(tag_store  != nullptr);
 
-    return cpu_call_jump(code_store, cmd_store, tag_store, cmd_asm);
+    return cpu_call_jump(code_store, cmd_store, tag_store, cmd_asm, asm_num);
 }
 
 bool parse_label(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store)
@@ -324,20 +333,22 @@ bool parse_label(source_cmd *const code_store, cpu_cmd *const cmd_store, label *
         return false;
     }
 
-    if (tag_find(tag_store, code + code_pos_before) != -1)
+    int find_pc = tag_find(tag_store, code + code_pos_before);
+    if (find_pc == -1)
     {
-        fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "redefined tag\n", code_line);
-        return false;
+        label_push(tag_store, code + code_pos_before, cmd_store->pc);
+        log_message("new tag: \"");
+        for (int i = 0; i < tag_store->data[tag_store->size - 1].name_size; ++i)
+        {
+            log_message("%c", tag_store->data[tag_store->size - 1].name[i]);
+        }
+        log_message("\"\n");
+        return true;
     }
+    if (find_pc == cmd_store->pc) return true;
 
-    label_push(tag_store, code + code_pos_before, cmd_store->pc);
-    log_message("new tag: \"");
-    for (int i = 0; i < tag_store->data[tag_store->size - 1].name_size; ++i)
-    {
-        log_message("%c", tag_store->data[tag_store->size - 1].name[i]);
-    }
-    log_message("\"\n");
-    return true;
+    fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "redefined tag\n", code_line);
+    return false;
 }
 
 bool parse_push(source_cmd *const code_store, cpu_cmd *const cmd_store)
@@ -489,7 +500,7 @@ bool cpu_operators(cpu_cmd *const cmd_store, ASM_CMD cmd_asm)
     return true;
 }
 
-bool cpu_call_jump(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, ASM_CMD cmd_asm)
+bool cpu_call_jump(source_cmd *const code_store, cpu_cmd *const cmd_store, label *const tag_store, ASM_CMD cmd_asm, int asm_num)
 {
     assert(code_store != nullptr);
     assert(cmd_store  != nullptr);
@@ -497,12 +508,13 @@ bool cpu_call_jump(source_cmd *const code_store, cpu_cmd *const cmd_store, label
     skip_source_spaces(code_store);
 
     int tag_address  = tag_find(tag_store, code + code_pos);
-    if (tag_address != -1)
-    {
-        unsigned char cmd = cmd_asm;
-        add_cpu_cmd(cmd_store, &cmd,         sizeof(unsigned char));
-        add_cpu_cmd(cmd_store, &tag_address, sizeof(int));
 
+    unsigned char cmd = cmd_asm;
+    add_cpu_cmd(cmd_store, &cmd,         sizeof(unsigned char));
+    add_cpu_cmd(cmd_store, &tag_address, sizeof(int));
+
+    if (tag_address != -1 || asm_num == 0)
+    {
         skip_source_word(code_store);
         return true;
     }
