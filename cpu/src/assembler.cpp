@@ -23,6 +23,9 @@ enum ASM_CMD
 {
     HLT     , //  0
 
+    IN      ,
+    OUT     ,
+
     PUSH    , //  1
     POP     , //  2
 
@@ -199,7 +202,7 @@ bool parse_general(source_cmd *const code_store, cpu_cmd *const cmd_store, label
 {
     log_header(__PRETTY_FUNCTION__);
 
-    log_message("\"");
+    log_message("\"\n");
     for (int i = 0; i < code_size; ++i) log_message("%c", code[i]);
     log_message("\"\n\n");
 
@@ -230,6 +233,7 @@ bool parse_general(source_cmd *const code_store, cpu_cmd *const cmd_store, label
             case CALL: cur_status = !parse_call(code_store, cmd_store, tag_store, asm_num); break;
             case RET : cur_status = !parse_ret (cmd_store);                        break;
 
+            case IN  : case OUT:
             case ADD : case SUB:
             case MUL : case DIV:
             case POW :
@@ -262,6 +266,9 @@ ASM_CMD define_cmd(source_cmd *const code_store)
     get_source_cmd(cmd, code_store);
 
     if (!strcasecmp("hlt" , cmd)) return HLT ;
+
+    if (!strcasecmp("in"  , cmd)) return IN  ;
+    if (!strcasecmp("out" , cmd)) return OUT ;
 
     if (!strcasecmp("push", cmd)) return PUSH;
     if (!strcasecmp("pop" , cmd)) return POP ;
