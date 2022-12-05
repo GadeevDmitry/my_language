@@ -86,8 +86,10 @@ bool cpu_mem_arg    (source_cmd *const code_store, cpu_cmd *const cmd_store, ASM
 
 bool assembler              (const char *assembler_buff, const int buff_size, cpu_cmd *const cmd_store);
 
-void get_source_word        (char *const buff, source_cmd *const code_store);
+void get_source_cmd         (char *const buff, source_cmd *const code_store);
+bool is_cmd_split           (const char  check);
 void skip_source_undef_cmd  (source_cmd *const code_store);
+void skip_source_line       (source_cmd *const code_store);
 void skip_source_word       (source_cmd *const code_store);
 void skip_source_spaces     (source_cmd *const code_store);
 
@@ -209,6 +211,7 @@ bool parse_general(source_cmd *const code_store, cpu_cmd *const cmd_store, label
     while (code_pos < code_size)
     {
         if (code[code_pos] == '\0') break;
+        if (code[code_pos] ==  '#') { skip_source_line(code_store); continue; }
 
         ASM_CMD cur_cmd     = define_cmd(code_store);
         bool    cur_status  = true;
@@ -256,7 +259,7 @@ ASM_CMD define_cmd(source_cmd *const code_store)
     log_message("code_pos_before = %d\n", code_pos_before);
 
     char cmd[CMD_SIZE] = {};
-    get_source_word(cmd, code_store);
+    get_source_cmd(cmd, code_store);
 
     if (!strcasecmp("hlt" , cmd)) return HLT ;
 
@@ -386,7 +389,7 @@ bool parse_pop(source_cmd *const code_store, cpu_cmd *const cmd_store)
     int code_pos_before = code_pos;
 
     char arg_void[CMD_SIZE] = {};
-    get_source_word(arg_void, code_store);
+    get_source_cmd(arg_void, code_store);
 
     if (strcasecmp(arg_void, "void"))
     {
@@ -597,7 +600,7 @@ bool cpu_mem_arg(source_cmd *const code_store, cpu_cmd *const cmd_store, ASM_CMD
 
 /*____________________________________OTHER____________________________________*/
 
-void get_source_word(char *const buff, source_cmd *const code_store)
+void get_source_cmd(char *const buff, source_cmd *const code_store)
 {
     assert(buff       != nullptr);
     assert(code_store != nullptr);
@@ -607,10 +610,20 @@ void get_source_word(char *const buff, source_cmd *const code_store)
     int  i = 0;
     for (i = 0; i < CMD_SIZE - 1 && code_pos < code_size; ++i)
     {
-        if (isspace(code[code_pos]) || code[code_pos] == ':' || code[code_pos] == '\0') break;
+        if (is_cmd_split(code[code_pos])) break;
         buff[i] =   code[code_pos++];
     }
     buff[i] = '\0';
+}
+
+bool is_cmd_split(const char check)
+{
+    if (isspace(check)) return true;
+    if (check == ':')   return true;
+    if (check == '#')   return true;
+    if (check == '\0')  return true;
+
+    return false;
 }
 
 void skip_source_word(source_cmd *const code_store)
@@ -619,7 +632,7 @@ void skip_source_word(source_cmd *const code_store)
 
     skip_source_spaces(code_store);
 
-    while (code_pos < code_size && !isspace(code[code_pos])) ++code_pos;
+    while (code_pos < code_size && !isspace(code[code_pos]) && code[code_pos] != '#') ++code_pos;
 }
 
 void skip_source_undef_cmd(source_cmd *const code_store)
@@ -627,8 +640,15 @@ void skip_source_undef_cmd(source_cmd *const code_store)
     assert(code_store != nullptr);
 
     skip_source_spaces(code_store);
-    while(code_pos < code_size && !isspace(code[code_pos]) && code[code_pos] != ':' && code[code_pos] != '\0') ++code_pos;
+    while(code_pos < code_size && !is_cmd_split(code[code_pos])) ++code_pos;
     skip_source_spaces(code_store);
+}
+
+void skip_source_line(source_cmd *const code_store)
+{
+    assert(code_store != nullptr);
+
+    while (code_pos < code_size && code[code_pos] != '\n') ++code_pos;
 }
 
 void skip_source_spaces(source_cmd *const code_store)
