@@ -65,6 +65,7 @@ void *assembler(const source *const code)
     assert(code != nullptr);
 
     translator my_asm = {}; translator_ctor(&my_asm, code);
+    bool no_err = true;
 
     for (int token_cnt = 0; token_cnt < lexis_pos;) //now lexis_pos is using as the size of lexis_data
     {
@@ -75,7 +76,14 @@ void *assembler(const source *const code)
     }
 }
 
-#define cur_token my_asm->lexis_data[*token_cnt]
+#define cur_token    my_asm->lexis_data[*token_cnt]
+#define still_inside still_inside_lexis_data(my_asm, token_cnt);
+#define check_inside                                                                                \
+   if (!still_inside)                                                                               \
+   {                                                                                                \
+    fprintf(stderr, TERMINAL_RED "\nERROR: " TERMINAL_CANCEL "no arguments at the end of file\n");  \
+    return false;                                                                                   \
+   }
 
 /**
 *   @brief Переводит инструкции процессора и их параметры.
@@ -154,10 +162,12 @@ bool translate_push(translator *const my_asm, int *const token_cnt)
 
     unsigned char cmd = PUSH;
     *token_cnt += 1;
+    check_inside
 
     if (cur_token.type == KEY_CHAR && cur_token.value.key == '[')
     {
         *token_cnt += 1;
+        check_inside
         return translate_ram(my_asm, token_cnt, cmd);
     }
     return translate_parametres(my_asm, cmd, token_cnt);
@@ -170,6 +180,7 @@ bool translate_pop(translator *const my_asm, int *const token_cnt)
 
     unsigned char cmd = POP;
     *token_cnt += 1;
+    check_inside
 
     if (cur_token.type == REG_NAME)
     {
@@ -183,6 +194,7 @@ bool translate_pop(translator *const my_asm, int *const token_cnt)
     if (cur_token.type == KEY_CHAR && cur_token.value.key == '[')
     {
         *token_cnt += 1;
+        check_inside
         return translate_ram(my_asm, token_cnt, cmd);
     }
 
@@ -209,7 +221,8 @@ bool translate_jump_call(translator *const my_asm, int *const token_cnt)
 
     unsigned char cmd = cur_token.value.instruction;
     *token_cnt += 1;
-
+    check_inside
+    
     switch(cur_token.type)
     {
         case INSTRUCTION: fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "instruction can't be the name of label\n", cur_token.token_line);
@@ -327,10 +340,12 @@ bool translate_reg_plus_int(translator *const my_asm, int *const token_cnt, REGI
         *cmd_param  = (*cmd_param) | (1 << PARAM_REG);
         *reg_arg    = cur_token.value.reg_num;
         *token_cnt += 1;
+        check_inside
 
         if (cur_token.type == KEY_CHAR && cur_token.value.key == '+')
         {
             *token_cnt += 1;
+            check_inside
 
             if (cur_token.type == INT_NUM)
             {
@@ -369,10 +384,12 @@ bool translate_int_plus_reg(translator *const my_asm, int *const token_cnt, REGI
         *cmd_param  = (*cmd_param) | (1 << PARAM_INT);
         *int_arg    = cur_token.value.int_num;
         *token_cnt += 1;
+        check_inside
 
         if (cur_token.type == KEY_CHAR && cur_token.value.key == '+')
         {
             *token_cnt += 1;
+            check_inside
 
             if (cur_token.type == REG_NAME)
             {
@@ -417,6 +434,8 @@ void executer_add_parametres(translator *const my_asm, const unsigned char cmd, 
 }
 
 #undef cur_token
+#undef still_inside
+#undef check_inside
 
 /*===========================================================================================================================*/
 // TRANSLATOR_CTOR_DTOR
@@ -443,8 +462,16 @@ void translator_dtor(translator *const my_asm)
 }
 
 /*===========================================================================================================================*/
-// EXTRA LABEL_STORE FUNCTION
+// EXTRA FUNCTION
 /*===========================================================================================================================*/
+
+bool still_inside_lexis_data(const translator *const my_asm, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+
+    return *token_cnt < my_asm->lexis_pos
+}
 
 int get_undef_token_num(const source *const code)
 {

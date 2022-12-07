@@ -114,11 +114,12 @@ void translator_ctor (translator *const my_asm, const source *const code);
 void translator_dtor (translator *const my_asm);
 
 /*===========================================================================================================================*/
-// EXTRA LABEL_STORE FUNCTION
+// EXTRA FUNCTION
 /*===========================================================================================================================*/
 
-int get_undef_token_num (const source     *const code);
-int get_label_pc        (const translator *const my_asm, int *const token_cnt);
+int  get_undef_token_num     (const source     *const code);
+bool still_inside_lexis_data (const translator *const my_asm, int *const token_cnt);
+int  get_label_pc            (const translator *const my_asm, int *const token_cnt);
 
 /*===========================================================================================================================*/
 // SOURCE_CTOR_DTOR
