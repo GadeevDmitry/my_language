@@ -2,32 +2,7 @@
 #define CPU
 
 typedef int cpu_type;
-const   int RAM_SIZE   = 10000;
 const   int REG_NUMBER = 8;
-
-struct cpu_cmd  // struct cpu_cmd to store information about cpu commands
-{
-    void *data; // array with commands
-    int   size; // size of .data
-    int     pc; // current position in .data
-};
-
-struct source_cmd           // struct source_cmd to store information about source file
-{
-    const char *code;       // array with source code
-    int         code_size;  // size of .code
-    int         code_pos;   // current position in .code
-    int         code_line;  // current line in .code
-};
-
-struct cpu
-{
-    cpu_type  ram[RAM_SIZE];
-    int       reg[REG_NUMBER + 1];
-
-    stack     stk_data;
-    stack     stk_calls;
-};
 
 enum REGISTER
 {
@@ -43,34 +18,78 @@ enum REGISTER
     RHX     ,
 };
 
+const char *REGISTER_NAMES[] =
+{
+    "ERR_REG"   ,
+
+    "RAX"       ,
+    "RBX"       ,
+    "RCX"       ,
+    "RDX"       ,
+    "REX"       ,
+    "RFX"       ,
+    "RGX"       ,
+    "RHX"       ,
+};
+
 enum ASM_CMD
 {
-    HLT     , //  0
+    HLT             , //  0
 
-    IN      ,
-    OUT     ,
+    IN              , //  1
+    OUT             , //  2
 
-    PUSH    , //  1
-    POP     , //  2
+    PUSH            , //  3
+    POP             , //  4
 
-    JMP     , //  3
-    JA      , //  4
-    JAE     , //  5
-    JB      , //  6
-    JBE     , //  7
-    JE      , //  8
-    JNE     , //  9
+    JMP             , //  5
+    JA              , //  6
+    JAE             , //  7
+    JB              , //  8
+    JBE             , //  9
+    JE              , // 10
+    JNE             , // 11
 
-    CALL    , // 10
-    RET     , // 11
+    CALL            , // 12
+    RET             , // 13
 
-    ADD     , // 12
-    SUB     , // 13
-    MUL     , // 14
-    DIV     , // 15
-    POW     , // 16
+    ADD             , // 14
+    SUB             , // 15
+    MUL             , // 16
+    DIV             , // 17
+    POW             , // 18
 
-    UNDEF   , // 17
+    UNDEF_ASM_CMD   , // 19
+};
+
+const char *ASM_CMD_NAMES[] =
+{
+    "HLT"           ,
+
+    "IN"            ,
+    "OUT"           ,
+
+    "PUSH"          ,
+    "POP"           ,
+
+    "JMP"           ,
+    "JA"            ,
+    "JAE"           ,
+    "JB"            ,
+    "JBE"           ,
+    "JE"            ,
+    "JNE"           ,
+
+    "CALL"          ,
+    "RET"           ,
+
+    "ADD"           ,
+    "SUB"           ,
+    "MUL"           ,
+    "DIV"           ,
+    "POW"           ,
+
+    "UNDEF_ASM_CMD" ,
 };
 
 enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         4 bit         |
@@ -79,10 +98,5 @@ enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         4 bi
     PARAM_REG = 6   ,   //----------------+-----------+-----------+-----------------------+----
     PARAM_MEM = 7   ,
 };
-
-void add_cpu_cmd    (cpu_cmd    *const  cmd_store, const void *cmd,       const size_t    cmd_size);
-void cpu_cmd_ctor   (cpu_cmd    *const  cmd_store,                        const int     store_size);
-void cpu_cmd_dtor   (cpu_cmd    *const  cmd_store                                                 );
-void source_cmd_ctor(source_cmd *const code_store, const void *code_buff, const int code_buff_size);
 
 #endif //CPU

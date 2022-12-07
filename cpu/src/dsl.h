@@ -1,9 +1,8 @@
-#define CODE(code_store) (code_store)->code
-#define SIZE(code_store) (code_store)->code_size
-#define  POS(code_store) (code_store)->code_pos
-#define LINE(code_store) (code_store)->code_line
+#define buff_data (code->buff.data)
+#define buff_line (code->buff.line)
+#define buff_size (code->buff.size)
+#define buff_pos  (code->buff.pos)
 
-#define code         CODE(code_store)
-#define code_size    SIZE(code_store)
-#define code_pos      POS(code_store)
-#define code_line    LINE(code_store)
+#define lexis_data      (code->lexis.data)
+#define lexis_pos       (code->lexis.pos)
+#define lexis_cur_token (code->lexis.cur_token)
