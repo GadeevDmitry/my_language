@@ -1,3 +1,5 @@
+/** @file */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -11,7 +13,6 @@
 #include "../../lib/graphviz_dump/graphviz_dump.h"
 
 #include "dsl.h"
-#include "label.h"
 #include "terminal_colors.h"
 #include "assembler.h"
 
@@ -44,6 +45,451 @@ int main(const int argc, const char *argv[])
     source_dtor(code);
     fclose(stream);
 }
+
+/*===========================================================================================================================*/
+// ASSEMBLER
+/*===========================================================================================================================*/
+
+/**
+*   @brief Переводит код на языке ассемблера в машинный.
+*
+*   @param code [in] - код для перевода
+*
+*   @return
+*
+*   @note Перед запуском данной функции необходим лексический анализ.
+*/
+
+void *assembler(const source *const code)
+{
+    assert(code != nullptr);
+
+    translator my_asm = {}; translator_ctor(&my_asm, code);
+
+    for (int token_cnt = 0; token_cnt < lexis_pos;) //now lexis_pos is using as the size of lexis_data
+    {
+        switch(lexis_data[token_cnt].type)
+        {
+            case INSTRUCTION: translate_instruction(&my_asm, &token_cnt);
+        }
+    }
+}
+
+#define cur_token my_asm->lexis_data[*token_cnt]
+
+/**
+*   @brief Переводит инструкции процессора и их параметры.
+*
+*   @param my_asm    [in][out] - транслятор
+*   @param token_cnt [in][out] - указатель на номер обрабатываемого токена
+*
+*   @return true, если синтаксической ошибки не произошло и false в противном случае
+*
+*   @note Значение по адресу token_cnt увеличивается после обработки очередного токена.
+*/
+
+bool translate_instruction(translator *const my_asm, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+
+    switch(cur_token.value.instruction)
+    {
+        case HLT :
+        case IN  :
+        case OUT :
+        case RET :
+        case ADD :
+        case SUB :
+        case MUL :
+        case DIV :
+        case POW : return translate_no_parametres(my_asm, token_cnt);
+        case PUSH: return translate_push         (my_asm, token_cnt);
+        case POP : return translate_pop          (my_asm, token_cnt);
+        case CALL:
+        case JMP :
+        case JA  :
+        case JAE :
+        case JB  :
+        case JBE :
+        case JE  :
+        case JNE : return translate_jump_call    (my_asm, token_cnt);
+
+        case UNDEF_ASM_CMD:
+        default           : log_error(         "default case in translate_instruction(): cur_token.value.instruction=%d(%d)\n", cur_token.token_line);
+                            assert   (false && "default case in translate_instruction()");
+                            break;
+    }
+    return false;
+}
+
+/**
+*   @brief Переводит инструкции без параметров.
+*
+*   @param my_asm    [in][out] - транслятор
+*   @param token_cnt [in][out] - указатель на номер обрабатываемого токена
+*
+*   @return true, если синтаксической ошибки не произошло и false в противном случае
+*
+*   @note Значение по адресу token_cnt увеличивается после обработки очередного токена.
+*/
+
+bool translate_no_parametres(translator *const my_asm, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+
+    unsigned char cmd = cur_token.value.instruction;
+
+    executer_add_cmd(my_asm->cpu, &cmd, sizeof(unsigned char));
+    *token_cnt += 1;
+
+    return true;
+}
+
+bool translate_push(translator *const my_asm, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+
+    unsigned char cmd = PUSH;
+    *token_cnt += 1;
+
+    if (cur_token.type == KEY_CHAR && cur_token.value.key == '[')
+    {
+        *token_cnt += 1;
+        return translate_ram(my_asm, token_cnt, cmd);
+    }
+    return translate_parametres(my_asm, cmd, token_cnt);
+}
+
+bool translate_pop(translator *const my_asm, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+
+    unsigned char cmd = POP;
+    *token_cnt += 1;
+
+    if (cur_token.type == REG_NAME)
+    {
+        cmd = cmd | (1 << PARAM_REG);
+        executer_add_parametres(my_asm, cmd, cur_token.value.reg_num, 0);
+
+        *token_cnt += 1;
+        return true;
+    }
+
+    if (cur_token.type == KEY_CHAR && cur_token.value.key == '[')
+    {
+        *token_cnt += 1;
+        return translate_ram(my_asm, token_cnt, cmd);
+    }
+
+    if (cur_token.type == UNDEF_TOKEN)
+    {
+        if (cur_token.value.token_len == 5 &&                 // "void": 4 characters + 1 null-character
+            !strncasecmp(my_asm->buff_data[cur_token.token_beg], "void", 4))
+        {
+            executer_add_cmd(my_asm->cpu, cmd, sizeof(unsigned char));
+
+            *token_cnt += 1;
+            return true;
+        }
+    }
+    fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "invalid pop-arg\n", cur_token.token_line);
+    *token_cnt += 1;
+    return false;
+}
+
+bool translate_jump_call(translator *const my_asm, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+
+    unsigned char cmd = cur_token.value.instruction;
+    *token_cnt += 1;
+
+    switch(cur_token.type)
+    {
+        case INSTRUCTION: fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "instruction can't be the name of label\n", cur_token.token_line);
+                          return false;
+        case REG_NAME   : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "register can't be the name of label\n", cur_token.token_line);
+                          return false;
+        case INT_NUM    : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "number can't be the name of label\n", cur_token.token_line);
+                          return false;
+        case KEY_CHAR   : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "key char can't be the name of label\n", cur_token.token_line);
+                          return false;
+
+        case UNDEF_TOKEN: {
+                            int link_pc = get_label_pc(my_asm, token_cnt);
+                            if (link_pc == -1)
+                            {
+                                fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "undefined tag\n", cur_token.token_line);
+                                *token_cnt += 1;
+                                return false;
+                            }
+                            executer_add_cmd(my_asm->cpu, &cmd    , sizeof(unsigned char));
+                            executer_add_cmd(my_asm->cpu, &link_pc, sizeof(int));
+
+                            *token_cnt += 1;
+                            return true;
+                          }
+        default: log_error(         "default case in translate_jump_call(): cur_token.type=%d(%d)\n", cur_token.type, __LINE__);
+                 assert   (false && "default case in translate_jump_call()");
+                 break;
+    }
+    return false;
+}
+
+bool translate_ram(translator *const my_asm, int *const token_cnt, unsigned char cmd)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+
+    cmd = cmd | (1 << PARAM_MEM);
+    bool right_param = translate_parametres(my_asm, cmd, token_cnt);
+
+    if (cur_token.type != KEY_CHAR && cur_token.value.key == ']')
+    {
+        *token_cnt += 1;
+        return right_param;
+    }
+    fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "skipped \']\'\n", cur_token.token_line);
+    *token_cnt += 1;
+    return false;
+}
+
+/**
+*   @brief Переводит выражение видов: REG, INT, REG+INT, INT+REG.
+*
+*   @param my_asm    [in][out] - транслятор
+*   @param token_cnt [in][out] - указатель на номер обрабатываемого токена
+*   @param reg_arg       [out] - указатель на переменную типа REGISTER, чтобы положить туда номер регистра-параметра
+*   @param int_arg       [out] - указатель на переменную типа int     , чтобы положить туда число-параметр
+*
+*   @return маска, кодирующая одно из четырёх выражений.
+*
+*   @note Маска равна нулю, в случае ошибки. Ошибкой является выражение одного из видов: !(INT | REG), INT+(!REG), REG+(!INT).
+*   @note Значение по адресу token_cnt увеличивается после обработки очередного токена.
+*/
+
+unsigned char translate_expretion(translator *const my_asm, int *const token_cnt, REGISTER *const reg_arg,
+                                                                                  int      *const int_arg)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+    assert(reg_arg   != nullptr);
+    assert(int_arg   != nullptr);
+
+    unsigned char cmd_param = 0;
+
+    if (!translate_reg_plus_int(my_asm, token_cnt, reg_arg, int_arg, &cmd_param)) return cmd_param = 0; //ошибка
+    if (cmd_param)                                                                return cmd_param;     //выражение правильного вида
+    
+    if (!translate_int_plus_reg(my_asm, token_cnt, reg_arg, int_arg, &cmd_param)) return cmd_param = 0;
+    if (!cmd_param)
+    {
+        fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "invalid expretion\n", cur_token.token_line);
+        *token_cnt += 1;
+    }
+    return cmd_param;
+}
+
+/**
+*   @brief Переводит выражение видов: REG, REG+INT.
+*
+*   @param my_asm    [in][out] - транслятор
+*   @param token_cnt [in][out] - указатель на номер обрабатываемого токена
+*   @param reg_arg       [out] - указатель на переменную типа REGISTER     , чтобы положить туда номер регистра-параметра
+*   @param int_arg       [out] - указатель на переменную типа int          , чтобы положить туда число-параметр
+*   @param cmd_param     [out] - указатель на переменную типа unsigned char, чтобы положить туда маску, кодирующую одно из двух выражений
+*
+*   @return true, если ошибки не произошло и false в противном случае
+*
+*   @note Ошибкой является выражение вида REG+(!INT). Выражение REG+(!INT) имеет маску, равную 0(так как это ошибка).
+*   @note Выражение (!REG) имеет маску, равную 0, но ошибкой не является. Выражения различаются по возвращаемому значению.
+*   @note Значение по адресу token_cnt увеличивается после обработки очередного токена.
+*/
+
+bool translate_reg_plus_int(translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
+                                                                            int           *const int_arg,
+                                                                            unsigned char *const cmd_param)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+    assert(reg_arg   != nullptr);
+    assert(int_arg   != nullptr);
+    assert(cmd_param != nullptr);
+
+    if (cur_token.type == REG_NAME)
+    {
+        *cmd_param  = (*cmd_param) | (1 << PARAM_REG);
+        *reg_arg    = cur_token.value.reg_num;
+        *token_cnt += 1;
+
+        if (cur_token.type == KEY_CHAR && cur_token.value.key == '+')
+        {
+            *token_cnt += 1;
+
+            if (cur_token.type == INT_NUM)
+            {
+                *cmd_param  = (*cmd_param) | (1 << PARAM_INT);
+                *int_arg    = cur_token.value.int_num;
+                *token_cnt += 1;
+
+                return true;
+            }
+
+            fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "invalid int-arg\n", cur_token.token_line);
+            *token_cnt += 1;
+            return false;
+        }
+        return true;
+    }
+    return true;
+}
+
+/**
+*   @brief Аналог translate_reg_plus_int().
+*/
+
+bool translate_int_plus_reg(translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
+                                                                            int           *const int_arg,
+                                                                            unsigned char *const cmd_param)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+    assert(reg_arg   != nullptr);
+    assert(int_arg   != nullptr);
+    assert(cmd_param != nullptr);
+
+    if (cur_token.type == INT_NUM)
+    {
+        *cmd_param  = (*cmd_param) | (1 << PARAM_INT);
+        *int_arg    = cur_token.value.int_num;
+        *token_cnt += 1;
+
+        if (cur_token.type == KEY_CHAR && cur_token.value.key == '+')
+        {
+            *token_cnt += 1;
+
+            if (cur_token.type == REG_NAME)
+            {
+                *cmd_param  = (*cmd_param) | (1 << PARAM_REG);
+                *reg_arg    = cur_token.value.reg_num;
+                *token_cnt += 1;
+
+                return true;
+            }
+            fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "invalid reg-arg\n", cur_token.token_line);
+            *token_cnt += 1;
+            return false;
+        }
+        return true;
+    }
+    return true;
+}
+
+bool translate_parametres(translator *const my_asm, unsigned char cmd, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+
+    REGISTER reg_arg = ERR_REG;
+    int      int_arg = 0;
+
+    unsigned char cmd_param = translate_expretion(my_asm, token_cnt, &reg_arg, &int_arg);
+    cmd = cmd  |  cmd_param;
+
+    executer_add_parametres(my_asm, &cmd, reg_arg, int_arg);
+    return cmd_param != 0;
+}
+
+void executer_add_parametres(translator *const my_asm, const unsigned char cmd, const REGISTER reg_arg, const int int_arg)
+{
+    assert(my_asm != nullptr);
+
+    executer_add_cmd(my_asm->cpu, &cmd, sizeof(unsigned char));
+        
+    if (cmd & (1 << PARAM_REG)) executer_add_cmd(my_asm->cpu, &reg_arg, sizeof(REGISTER));
+    if (cmd & (1 << PARAM_INT)) executer_add_cmd(my_asm->cpu, &int_arg, sizeof(int));
+}
+
+#undef cur_token
+
+/*===========================================================================================================================*/
+// TRANSLATOR_CTOR_DTOR
+/*===========================================================================================================================*/
+
+void translator_ctor(translator *const my_asm, const source *const code)
+{
+    assert(my_asm != nullptr);
+    assert(code != nullptr);
+
+    my_asm->code = code;
+    
+    label_store_ctor(&my_asm->link, get_undef_token_num(code));
+    executer_ctor   (&my_asm->cpu , lexis_pos);
+}
+
+void translator_dtor(translator *const my_asm)
+{
+    assert(my_asm != nullptr);
+
+    source_dtor     ( my_asm->code);
+    label_store_dtor(&my_asm->tags);
+    executer_dtor   (&my_asm->cpu );
+}
+
+/*===========================================================================================================================*/
+// EXTRA LABEL_STORE FUNCTION
+/*===========================================================================================================================*/
+
+int get_undef_token_num(const source *const code)
+{
+    assert(code != nullptr);
+
+    int num = 0;
+
+    for (int i = 0; i < lexis_pos; ++i)
+    {
+        if (lexis_data[i].type == UNDEF_TOKEN) ++num;
+    }
+    return num;
+}
+
+#define cur_token my_asm->lexis_data[*token_cnt]
+
+#define cur_label_pc        my_asm->link.store[label_cnt].pc
+#define cur_label_token_num my_asm->link.store[label_cnt].token_num
+#define cur_label_token     my_asm->lexis_data[cur_label_token_num]
+
+int get_label_pc(const translator *const my_asm, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+    assert(cur_token.type == UNDEF_TOKEN);
+
+    for (int label_cnt = 0; label_cnt < my_asm->link.size; ++label_cnt)
+    {
+        if (cur_label_token.value.token_len == cur_token.value.token_len)
+        {
+            if (!strncasecmp(my_asm->buff_data[      cur_token.token_beg],
+                             my_asm->buff_data[cur_label_token.token_beg], cur_token.value.token_len))
+            {
+                return cur_label_pc;
+            }
+        }
+    }
+    return -1;
+}
+
+#undef cur_token
+
+#undef cur_label_pc
+#undef cur_label_token_num
+#undef cur_label_token
 
 /*===========================================================================================================================*/
 // SOURCE_CTOR_DTOR
@@ -96,7 +542,7 @@ bool source_lexis_ctor(source *const code)
     return true;
 }
 
-void source_dtor(source *const code)
+void source_dtor(source *const code) //only if "code" was created by calloc or malloc
 {
     if (code == nullptr)
     {

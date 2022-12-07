@@ -2,6 +2,7 @@
 #define ASSEMBLER
 
 #include "cpu.h"
+#include "label.h"
 
 /*===========================================================================================================================*/
 // CONST
@@ -10,7 +11,7 @@
 const char *LEXIS_GRAPHVIZ_HEADER = "digraph {\n"
                                     "splines=ortho\n"
                                     "node[shape=record, style=\"rounded, filled\", fontsize=8]\n";
-const char *KEY_CHARS             = "[]#:";
+const char *KEY_CHARS             = "[]#:+";
 const int   REG_NAME_LEN          = 4; //including null-character in the end
 
 enum TOKEN_TYPE
@@ -38,11 +39,11 @@ const char *TOKEN_TYPE_NAMES[] =
 struct token
 {
     TOKEN_TYPE type;
-    int        token_beg;       // number of position in buffer where token starts
-    int        token_line;      // number of line     in buffer where token places
+    int        token_beg;       // номер символа, с которого начинается токен
+    int        token_line;      // номер строки, где находится токен
     union
     {
-        ASM_CMD instruction;    // .type = INSTRUCTION
+        ASM_CMD instruction;    // .type = INSTRUCTION,
         REGISTER    reg_num;    // .type = REG_NAME
         int         int_num;    // .type = INT_NUM
         char            key;    // .type = KEY_CHAR
@@ -56,22 +57,68 @@ struct source
 {
     struct
     {
-        const char *data;       // source code from file
-        int          pos;       // current position in .data
-        int         line;       // current line     in .data
-        int         size;       // size of .data
+        const char *data;       // буффер с исходным кодом
+        int          pos;       // текущая позиция в .data
+        int         line;       // текущая строка в .data
+        int         size;       // размер .data
     }
     buff;
 
     struct
     {
-        token      *data;       // array with tokens
-        int          pos;       // current free place for new token
-        char  *cur_token;       // current word to determine the next token
+        token      *data;       // массив с токенами
+        int          pos;       // индекс первой свободной ячейки для нового токена (он же размер .data)
+        char  *cur_token;       // текущее слово, для которого нужно определить токен
     }
     lexis;
 };
 
+struct translator
+{
+    source     *code;           // структура с исходным кодом
+    label_store link;           // структура с метками
+    executer     cpu;           // структура для хранения переведённых инструкций и параметров
+};
+
+/*===========================================================================================================================*/
+// ASSEMBLER
+/*===========================================================================================================================*/
+
+void *assembler(const source *const code);
+
+void          translate_instruction   (translator *const my_asm, int *const token_cnt);
+void          translate_no_parametres (translator *const my_asm, int *const token_cnt);
+bool          translate_push          (translator *const my_asm, int *const token_cnt);
+bool          translate_pop           (translator *const my_asm, int *const token_cnt);
+bool          translate_jump_call     (translator *const my_asm, int *const token_cnt);
+
+bool          translate_ram           (translator *const my_asm, int *const token_cnt, unsigned char cmd);
+unsigned char translate_expretion     (translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
+                                                                                       int           *const int_arg);
+bool          translate_reg_plus_int  (translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
+                                                                                       int           *const int_arg,
+                                                                                       unsigned char *const cmd_param);
+bool          translate_int_plus_reg  (translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
+                                                                                       int           *const int_arg,
+                                                                                       unsigned char *const cmd_param);
+
+bool          translate_parametres    (translator *const my_asm,       unsigned char cmd, int *const token_cnt);
+void          executer_add_parametres (translator *const my_asm, const unsigned char cmd, const REGISTER reg_arg,
+                                                                                          const int      int_arg);
+
+/*===========================================================================================================================*/
+// TRANSLATOR_CTOR_DTOR
+/*===========================================================================================================================*/
+
+void translator_ctor (translator *const my_asm, const source *const code);
+void translator_dtor (translator *const my_asm);
+
+/*===========================================================================================================================*/
+// EXTRA LABEL_STORE FUNCTION
+/*===========================================================================================================================*/
+
+int get_undef_token_num (const source     *const code);
+int get_label_pc        (const translator *const my_asm, int *const token_cnt);
 
 /*===========================================================================================================================*/
 // SOURCE_CTOR_DTOR
