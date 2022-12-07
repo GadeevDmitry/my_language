@@ -84,10 +84,10 @@ struct translator
 // ASSEMBLER
 /*===========================================================================================================================*/
 
-void *assembler(const source *const code);
+bool          assembler(source *const code, translator *asm_ret);
 
-void          translate_instruction   (translator *const my_asm, int *const token_cnt);
-void          translate_no_parametres (translator *const my_asm, int *const token_cnt);
+bool          translate_instruction   (translator *const my_asm, int *const token_cnt);
+bool          translate_no_parametres (translator *const my_asm, int *const token_cnt);
 bool          translate_push          (translator *const my_asm, int *const token_cnt);
 bool          translate_pop           (translator *const my_asm, int *const token_cnt);
 bool          translate_jump_call     (translator *const my_asm, int *const token_cnt);
@@ -101,6 +101,7 @@ bool          translate_reg_plus_int  (translator *const my_asm, int *const toke
 bool          translate_int_plus_reg  (translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
                                                                                        int           *const int_arg,
                                                                                        unsigned char *const cmd_param);
+bool          translate_undef_token   (translator *const my_asm, int *const token_cnt);
 
 bool          translate_parametres    (translator *const my_asm,       unsigned char cmd, int *const token_cnt);
 void          executer_add_parametres (translator *const my_asm, const unsigned char cmd, const REGISTER reg_arg,
@@ -110,7 +111,7 @@ void          executer_add_parametres (translator *const my_asm, const unsigned 
 // TRANSLATOR_CTOR_DTOR
 /*===========================================================================================================================*/
 
-void translator_ctor (translator *const my_asm, const source *const code);
+void translator_ctor (translator *const my_asm, source *const code);
 void translator_dtor (translator *const my_asm);
 
 /*===========================================================================================================================*/
@@ -162,6 +163,8 @@ void skip_source_spaces (source *const code);
 /*===========================================================================================================================*/
 // DUMP
 /*===========================================================================================================================*/
+
+void lexis_text_dump         (const source *const code);
 
 void lexis_graphviz_dump     (const source *const code);
 void do_lexis_graphviz_dump  (const source *const code, FILE *const stream);

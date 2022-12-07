@@ -30,11 +30,11 @@ bool label_store_ctor(label_store *const link, const int capacity)
     assert(link     != nullptr);
     assert(capacity >=       0);
 
-    link->label    = (label *) log_calloc(capacity, sizeof(label));
+    link->store    = (label *) log_calloc((size_t) capacity, sizeof(label));
     link->capacity = capacity;
     link->size     = 0;
     
-    if (link->label == nullptr)
+    if (link->store == nullptr)
     {
         log_error(        "can't allocate memory for label array(%d)\n", __LINE__);
         fprintf  (stderr, "can't allocate memory for label array\n");
@@ -47,7 +47,7 @@ void label_store_dtor(label_store *const link)
 {
     assert(link != nullptr);
 
-    log_free(link->label);
+    log_free(link->store);
 }
 
 /*===========================================================================================================================*/

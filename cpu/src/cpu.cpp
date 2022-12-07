@@ -30,8 +30,10 @@ void executer_ctor(executer *const cpu)
 void executer_ctor(executer *const cpu, const int size)
 {
     assert(cpu != nullptr);
-
-    cpu->cmd     = log_calloc(size, sizeof(cpu_type));
+    //>>>>>>>>>>>>>>
+    log_message("\nexecuter_ctor: capacity = %d(%d)\n", size, __LINE__);
+    //<<<<<<<<<<<<<<
+    cpu->cmd     = log_calloc((size_t) size, sizeof(cpu_type));
     cpu->capcity = size;
     cpu->pc      = 0;
 }
@@ -51,8 +53,8 @@ void executer_add_cmd(executer *const cpu, const void *const cmd, const size_t c
 {
     assert(cpu != nullptr);
     assert(cmd != nullptr);
-    assert(cpu->pc + cmd_size <= cpu->capcity);
+    assert((size_t) cpu->pc + cmd_size <= (size_t) cpu->capcity * sizeof(cpu_type));
 
     memcpy((char *) cpu->cmd + cpu->pc, cmd, cmd_size);
-    cpu->pc += cmd_size;
+    cpu->pc += (int) cmd_size;
 }

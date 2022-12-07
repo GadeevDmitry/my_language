@@ -5,8 +5,8 @@
 // CONST
 /*===========================================================================================================================*/
 
-typedef int cpu_type;
-const   int REG_NUMBER = 8;
+typedef      int cpu_type;
+static const int REG_NUMBER = 8;
 
 enum REGISTER
 {
@@ -22,7 +22,7 @@ enum REGISTER
     RHX     ,
 };
 
-const char *REGISTER_NAMES[] =
+static const char *REGISTER_NAMES[] =
 {
     "ERR_REG"   ,
 
@@ -66,7 +66,7 @@ enum ASM_CMD
     UNDEF_ASM_CMD   , // 19
 };
 
-const char *ASM_CMD_NAMES[] =
+static const char *ASM_CMD_NAMES[] =
 {
     "HLT"           ,
 

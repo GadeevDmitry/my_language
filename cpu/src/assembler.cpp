@@ -40,9 +40,13 @@ int main(const int argc, const char *argv[])
     }
 
     lexical_analyzer   (code);
+    lexis_text_dump    (code);
     lexis_graphviz_dump(code);
 
-    source_dtor(code);
+    translator *const   asm_result = nullptr;
+    if (assembler(code, asm_result)) fprintf(stderr, TERMINAL_GREEN "compile success\n" TERMINAL_CANCEL);
+    else                             fprintf(stderr, TERMINAL_RED "\ncompile faliled\n" TERMINAL_CANCEL);
+
     fclose(stream);
 }
 
@@ -50,34 +54,50 @@ int main(const int argc, const char *argv[])
 // ASSEMBLER
 /*===========================================================================================================================*/
 
-/**
-*   @brief Переводит код на языке ассемблера в машинный.
-*
-*   @param code [in] - код для перевода
-*
-*   @return
-*
-*   @note Перед запуском данной функции необходим лексический анализ.
-*/
-
-void *assembler(const source *const code)
+bool assembler(source *const code, translator *asm_ret)
 {
-    assert(code != nullptr);
+    assert(code    != nullptr);
+    //assert(asm_ret != nullptr);
 
     translator my_asm = {}; translator_ctor(&my_asm, code);
     bool no_err = true;
 
     for (int token_cnt = 0; token_cnt < lexis_pos;) //now lexis_pos is using as the size of lexis_data
     {
+        int cur_no_err = true;
+
         switch(lexis_data[token_cnt].type)
         {
-            case INSTRUCTION: translate_instruction(&my_asm, &token_cnt);
+            case INSTRUCTION: cur_no_err = translate_instruction(&my_asm, &token_cnt);
+                              break;
+
+            case INT_NUM    : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "number can't be the instruction or label\n", lexis_data[token_cnt++].token_line);
+                              cur_no_err = false;
+                              break;
+            case REG_NAME   : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "register can't be the instruction or label\n", lexis_data[token_cnt++].token_line);
+                              cur_no_err = false;
+                              break;
+            case KEY_CHAR   : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "instruction or label can't include key characters\n", lexis_data[token_cnt++].token_line);
+                              cur_no_err = false;
+                              break;
+            case UNDEF_TOKEN: cur_no_err = translate_undef_token(&my_asm, &token_cnt);
+                              break;
+            
+            default: log_error(         "default case in assembler(): lexis_data[token_cnt].type=%d(%d)\n", lexis_data[token_cnt].type, __LINE__);
+                     assert   (false && "default case in assembler()");
+                     break;
         }
+        no_err = (no_err == false) ? false : cur_no_err;
     }
+
+    translator_dtor(&my_asm);
+
+    if (no_err) return true;
+    return false;
 }
 
 #define cur_token    my_asm->lexis_data[*token_cnt]
-#define still_inside still_inside_lexis_data(my_asm, token_cnt);
+#define still_inside still_inside_lexis_data(my_asm, token_cnt)
 #define check_inside                                                                                \
    if (!still_inside)                                                                               \
    {                                                                                                \
@@ -149,7 +169,7 @@ bool translate_no_parametres(translator *const my_asm, int *const token_cnt)
 
     unsigned char cmd = cur_token.value.instruction;
 
-    executer_add_cmd(my_asm->cpu, &cmd, sizeof(unsigned char));
+    executer_add_cmd(&my_asm->cpu, &cmd, sizeof(unsigned char));
     *token_cnt += 1;
 
     return true;
@@ -201,9 +221,9 @@ bool translate_pop(translator *const my_asm, int *const token_cnt)
     if (cur_token.type == UNDEF_TOKEN)
     {
         if (cur_token.value.token_len == 5 &&                 // "void": 4 characters + 1 null-character
-            !strncasecmp(my_asm->buff_data[cur_token.token_beg], "void", 4))
+            !strncasecmp(my_asm->buff_data+cur_token.token_beg, "void", 4))
         {
-            executer_add_cmd(my_asm->cpu, cmd, sizeof(unsigned char));
+            executer_add_cmd(&my_asm->cpu, &cmd, sizeof(unsigned char));
 
             *token_cnt += 1;
             return true;
@@ -226,12 +246,16 @@ bool translate_jump_call(translator *const my_asm, int *const token_cnt)
     switch(cur_token.type)
     {
         case INSTRUCTION: fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "instruction can't be the name of label\n", cur_token.token_line);
+                          *token_cnt += 1;
                           return false;
         case REG_NAME   : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "register can't be the name of label\n", cur_token.token_line);
+                          *token_cnt += 1;
                           return false;
         case INT_NUM    : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "number can't be the name of label\n", cur_token.token_line);
+                          *token_cnt += 1;
                           return false;
         case KEY_CHAR   : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "key char can't be the name of label\n", cur_token.token_line);
+                          *token_cnt += 1;
                           return false;
 
         case UNDEF_TOKEN: {
@@ -242,8 +266,8 @@ bool translate_jump_call(translator *const my_asm, int *const token_cnt)
                                 *token_cnt += 1;
                                 return false;
                             }
-                            executer_add_cmd(my_asm->cpu, &cmd    , sizeof(unsigned char));
-                            executer_add_cmd(my_asm->cpu, &link_pc, sizeof(int));
+                            executer_add_cmd(&my_asm->cpu, &cmd    , sizeof(unsigned char));
+                            executer_add_cmd(&my_asm->cpu, &link_pc, sizeof(int));
 
                             *token_cnt += 1;
                             return true;
@@ -263,7 +287,7 @@ bool translate_ram(translator *const my_asm, int *const token_cnt, unsigned char
     cmd = cmd | (1 << PARAM_MEM);
     bool right_param = translate_parametres(my_asm, cmd, token_cnt);
 
-    if (cur_token.type != KEY_CHAR && cur_token.value.key == ']')
+    if (cur_token.type == KEY_CHAR && cur_token.value.key == ']')
     {
         *token_cnt += 1;
         return right_param;
@@ -408,6 +432,32 @@ bool translate_int_plus_reg(translator *const my_asm, int *const token_cnt, REGI
     return true;
 }
 
+bool translate_undef_token(translator *const my_asm, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+    assert(cur_token.type == UNDEF_TOKEN);
+
+    if (get_label_pc(my_asm, token_cnt) != -1)
+    {
+        fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "redefined label\n", cur_token.token_line);
+        *token_cnt += 1;
+        return false;
+    }
+    label_store_push(&my_asm->link, *token_cnt, my_asm->cpu.pc);
+    *token_cnt += 1;
+    check_inside
+
+    if (cur_token.type == KEY_CHAR && cur_token.value.key == ':')
+    {
+        *token_cnt += 1;
+        return true;
+    }
+    fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "skipped \':\' after label or undefined instruction\n", cur_token.token_line);
+    *token_cnt += 1;
+    return false;
+}
+
 bool translate_parametres(translator *const my_asm, unsigned char cmd, int *const token_cnt)
 {
     assert(my_asm    != nullptr);
@@ -419,7 +469,7 @@ bool translate_parametres(translator *const my_asm, unsigned char cmd, int *cons
     unsigned char cmd_param = translate_expretion(my_asm, token_cnt, &reg_arg, &int_arg);
     cmd = cmd  |  cmd_param;
 
-    executer_add_parametres(my_asm, &cmd, reg_arg, int_arg);
+    executer_add_parametres(my_asm, cmd, reg_arg, int_arg);
     return cmd_param != 0;
 }
 
@@ -427,10 +477,10 @@ void executer_add_parametres(translator *const my_asm, const unsigned char cmd, 
 {
     assert(my_asm != nullptr);
 
-    executer_add_cmd(my_asm->cpu, &cmd, sizeof(unsigned char));
+    executer_add_cmd(&my_asm->cpu, &cmd, sizeof(unsigned char));
         
-    if (cmd & (1 << PARAM_REG)) executer_add_cmd(my_asm->cpu, &reg_arg, sizeof(REGISTER));
-    if (cmd & (1 << PARAM_INT)) executer_add_cmd(my_asm->cpu, &int_arg, sizeof(int));
+    if (cmd & (1 << PARAM_REG)) executer_add_cmd(&my_asm->cpu, &reg_arg, sizeof(REGISTER));
+    if (cmd & (1 << PARAM_INT)) executer_add_cmd(&my_asm->cpu, &int_arg, sizeof(int));
 }
 
 #undef cur_token
@@ -441,7 +491,7 @@ void executer_add_parametres(translator *const my_asm, const unsigned char cmd, 
 // TRANSLATOR_CTOR_DTOR
 /*===========================================================================================================================*/
 
-void translator_ctor(translator *const my_asm, const source *const code)
+void translator_ctor(translator *const my_asm, source *const code)
 {
     assert(my_asm != nullptr);
     assert(code != nullptr);
@@ -457,7 +507,7 @@ void translator_dtor(translator *const my_asm)
     assert(my_asm != nullptr);
 
     source_dtor     ( my_asm->code);
-    label_store_dtor(&my_asm->tags);
+    label_store_dtor(&my_asm->link);
     executer_dtor   (&my_asm->cpu );
 }
 
@@ -470,7 +520,7 @@ bool still_inside_lexis_data(const translator *const my_asm, int *const token_cn
     assert(my_asm    != nullptr);
     assert(token_cnt != nullptr);
 
-    return *token_cnt < my_asm->lexis_pos
+    return *token_cnt < my_asm->lexis_pos;
 }
 
 int get_undef_token_num(const source *const code)
@@ -502,8 +552,8 @@ int get_label_pc(const translator *const my_asm, int *const token_cnt)
     {
         if (cur_label_token.value.token_len == cur_token.value.token_len)
         {
-            if (!strncasecmp(my_asm->buff_data[      cur_token.token_beg],
-                             my_asm->buff_data[cur_label_token.token_beg], cur_token.value.token_len))
+            if (!strncasecmp(my_asm->buff_data+      cur_token.token_beg,
+                             my_asm->buff_data+cur_label_token.token_beg, (size_t) cur_token.value.token_len))
             {
                 return cur_label_pc;
             }
@@ -805,6 +855,36 @@ void skip_source_spaces(source *const code)
 /*===========================================================================================================================*/
 // DUMP
 /*===========================================================================================================================*/
+
+void lexis_text_dump(const source *const code)
+{
+    if (code == nullptr)
+    {
+        log_warning("code to dump is nullptr(%d)\n", __LINE__);
+        return;
+    }
+
+    log_message("\n"
+                "code\n"
+                "{\n"
+                "    buff\n"
+                "    {\n"
+                "        data = %p\n"
+                "        pos  = %d\n"
+                "        line = %d\n"
+                "        size = %d\n"
+                "    }\n"
+                "    lexis\n"
+                "    {\n"
+                "        data      = %p\n"
+                "        pos       = %d\n"
+                "        cur_token = %p\n"
+                "    }\n"
+                "}\n\n"
+                ,
+                 buff_data,  buff_pos, buff_line, buff_size,
+                lexis_data, lexis_pos, lexis_cur_token);
+}
 
 void lexis_graphviz_dump(const source *const code)
 {
