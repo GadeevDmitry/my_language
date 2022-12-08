@@ -40,8 +40,8 @@ int main(const int argc, const char *argv[])
     }
 
     lexical_analyzer   (code);
-    lexis_text_dump    (code);
-    lexis_graphviz_dump(code);
+  //lexis_text_dump    (code);
+  //lexis_graphviz_dump(code);
 
     translator my_asm = {};
 
@@ -475,9 +475,9 @@ bool translate_undef_token(translator *const my_asm, int *const token_cnt)
     if (cur_label_pc == -1)
     {
         label_store_push(&my_asm->link, *token_cnt, my_asm->cpu.pc);
-        check_inside
     }
     *token_cnt += 1;
+    check_inside
     if (cur_token.type == KEY_CHAR && cur_token.value.key == ':')
     {
         *token_cnt += 1;
@@ -673,7 +673,7 @@ void lexical_analyzer(source *const code)
     assert(code != nullptr);
 
     skip_source_spaces(code);
-    while (buff_pos < buff_size)
+    while (buff_pos < buff_size && buff_data[buff_pos] != '\0')
     {
         if (is_comment (code)) continue;      // spaces are skipped after is_comment()
         if (is_key_char(buff_data[buff_pos])) create_key_char_token(code);
@@ -730,7 +730,10 @@ bool get_int_num(const char *cur_token, int *const ret) //ret = nullptr
     assert(cur_token != nullptr);
 
     int int_num = 0;
-    if (sscanf(cur_token, "%d", &int_num) == 0) return false;
+    int num_len = 0;
+
+    if (sscanf(cur_token, "%d%n", &int_num, &num_len) <= 0) return false;
+    if (cur_token[num_len] != '\0')                         return false;
 
     if (ret != nullptr) *ret = int_num;
     return true;
