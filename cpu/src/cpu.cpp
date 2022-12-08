@@ -30,9 +30,7 @@ void executer_ctor(executer *const cpu)
 void executer_ctor(executer *const cpu, const int size)
 {
     assert(cpu != nullptr);
-    //>>>>>>>>>>>>>>
-    log_message("\nexecuter_ctor: capacity = %d(%d)\n", size, __LINE__);
-    //<<<<<<<<<<<<<<
+
     cpu->cmd     = log_calloc((size_t) size, sizeof(cpu_type));
     cpu->capcity = size;
     cpu->pc      = 0;

@@ -84,13 +84,14 @@ struct translator
 // ASSEMBLER
 /*===========================================================================================================================*/
 
-bool          assembler(source *const code, translator *asm_ret);
+bool             assembler(source *const code, translator *const my_asm);
+bool          do_assembler(source *const code, translator *const my_asm, const int asm_num);
 
-bool          translate_instruction   (translator *const my_asm, int *const token_cnt);
+bool          translate_instruction   (translator *const my_asm, int *const token_cnt, const int asm_num);
 bool          translate_no_parametres (translator *const my_asm, int *const token_cnt);
 bool          translate_push          (translator *const my_asm, int *const token_cnt);
 bool          translate_pop           (translator *const my_asm, int *const token_cnt);
-bool          translate_jump_call     (translator *const my_asm, int *const token_cnt);
+bool          translate_jump_call     (translator *const my_asm, int *const token_cnt, const int asm_num);
 
 bool          translate_ram           (translator *const my_asm, int *const token_cnt, unsigned char cmd);
 unsigned char translate_expretion     (translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
@@ -164,7 +165,8 @@ void skip_source_spaces (source *const code);
 // DUMP
 /*===========================================================================================================================*/
 
-void lexis_text_dump         (const source *const code);
+void label_text_dump         (const label_store *const link);
+void lexis_text_dump         (const source      *const code);
 
 void lexis_graphviz_dump     (const source *const code);
 void do_lexis_graphviz_dump  (const source *const code, FILE *const stream);

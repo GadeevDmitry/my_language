@@ -29,7 +29,7 @@ int main(const int argc, const char *argv[])
     }
     source *code = new_source(argv[1]);
     FILE *stream = fopen     (argv[2], "w");
-    
+
     if (code   == nullptr) { fclose(stream); return 0; }
     if (stream == nullptr)
     {
@@ -43,9 +43,16 @@ int main(const int argc, const char *argv[])
     lexis_text_dump    (code);
     lexis_graphviz_dump(code);
 
-    translator *const   asm_result = nullptr;
-    if (assembler(code, asm_result)) fprintf(stderr, TERMINAL_GREEN "compile success\n" TERMINAL_CANCEL);
-    else                             fprintf(stderr, TERMINAL_RED "\ncompile faliled\n" TERMINAL_CANCEL);
+    translator my_asm = {};
+
+    if (assembler(code, &my_asm))
+    {
+        fwrite (my_asm.cpu.cmd, sizeof(char), my_asm.cpu.pc + 1, stream);
+        fprintf(stderr, TERMINAL_GREEN "compile success\n" TERMINAL_CANCEL);
+
+        translator_dtor(&my_asm);
+    }
+    else fprintf(stderr, TERMINAL_RED "\ncompile faliled\n" TERMINAL_CANCEL);
 
     fclose(stream);
 }
@@ -54,12 +61,31 @@ int main(const int argc, const char *argv[])
 // ASSEMBLER
 /*===========================================================================================================================*/
 
-bool assembler(source *const code, translator *asm_ret)
+bool assembler(source *const code, translator *const my_asm)
 {
-    assert(code    != nullptr);
-    //assert(asm_ret != nullptr);
+    assert(code   != nullptr);
+    assert(my_asm != nullptr);
 
-    translator my_asm = {}; translator_ctor(&my_asm, code);
+    translator_ctor(my_asm, code);
+
+    if (!do_assembler(code, my_asm, 1)) return false;
+    
+    my_asm->cpu.pc = 0;
+    label_text_dump(&my_asm->link);
+
+    if (!do_assembler(code, my_asm, 2)) return false;
+
+    return true;
+}
+
+bool do_assembler(source *const code, translator *const my_asm, const int asm_num) //asm_num for name of labels after their calling
+{
+    log_header(__PRETTY_FUNCTION__);
+    log_message("asm_num=%d\n", asm_num);
+
+    assert(code   != nullptr);
+    assert(my_asm != nullptr);
+
     bool no_err = true;
 
     for (int token_cnt = 0; token_cnt < lexis_pos;) //now lexis_pos is using as the size of lexis_data
@@ -68,7 +94,7 @@ bool assembler(source *const code, translator *asm_ret)
 
         switch(lexis_data[token_cnt].type)
         {
-            case INSTRUCTION: cur_no_err = translate_instruction(&my_asm, &token_cnt);
+            case INSTRUCTION: cur_no_err = translate_instruction(my_asm, &token_cnt, asm_num);
                               break;
 
             case INT_NUM    : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "number can't be the instruction or label\n", lexis_data[token_cnt++].token_line);
@@ -80,7 +106,7 @@ bool assembler(source *const code, translator *asm_ret)
             case KEY_CHAR   : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "instruction or label can't include key characters\n", lexis_data[token_cnt++].token_line);
                               cur_no_err = false;
                               break;
-            case UNDEF_TOKEN: cur_no_err = translate_undef_token(&my_asm, &token_cnt);
+            case UNDEF_TOKEN: cur_no_err = translate_undef_token(my_asm, &token_cnt);
                               break;
             
             default: log_error(         "default case in assembler(): lexis_data[token_cnt].type=%d(%d)\n", lexis_data[token_cnt].type, __LINE__);
@@ -90,9 +116,10 @@ bool assembler(source *const code, translator *asm_ret)
         no_err = (no_err == false) ? false : cur_no_err;
     }
 
-    translator_dtor(&my_asm);
+    if (no_err) { log_end_header(); return true; }
 
-    if (no_err) return true;
+    translator_dtor(my_asm);
+    log_end_header ();
     return false;
 }
 
@@ -116,7 +143,7 @@ bool assembler(source *const code, translator *asm_ret)
 *   @note Значение по адресу token_cnt увеличивается после обработки очередного токена.
 */
 
-bool translate_instruction(translator *const my_asm, int *const token_cnt)
+bool translate_instruction(translator *const my_asm, int *const token_cnt, const int asm_num)
 {
     assert(my_asm    != nullptr);
     assert(token_cnt != nullptr);
@@ -141,7 +168,7 @@ bool translate_instruction(translator *const my_asm, int *const token_cnt)
         case JB  :
         case JBE :
         case JE  :
-        case JNE : return translate_jump_call    (my_asm, token_cnt);
+        case JNE : return translate_jump_call    (my_asm, token_cnt, asm_num);
 
         case UNDEF_ASM_CMD:
         default           : log_error(         "default case in translate_instruction(): cur_token.value.instruction=%d(%d)\n", cur_token.token_line);
@@ -234,7 +261,7 @@ bool translate_pop(translator *const my_asm, int *const token_cnt)
     return false;
 }
 
-bool translate_jump_call(translator *const my_asm, int *const token_cnt)
+bool translate_jump_call(translator *const my_asm, int *const token_cnt, const int asm_num)
 {
     assert(my_asm    != nullptr);
     assert(token_cnt != nullptr);
@@ -260,15 +287,15 @@ bool translate_jump_call(translator *const my_asm, int *const token_cnt)
 
         case UNDEF_TOKEN: {
                             int link_pc = get_label_pc(my_asm, token_cnt);
-                            if (link_pc == -1)
-                            {
-                                fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "undefined tag\n", cur_token.token_line);
-                                *token_cnt += 1;
-                                return false;
-                            }
                             executer_add_cmd(&my_asm->cpu, &cmd    , sizeof(unsigned char));
                             executer_add_cmd(&my_asm->cpu, &link_pc, sizeof(int));
 
+                            if (link_pc == -1 && asm_num == 2)
+                            {
+                                fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "undefined label\n", cur_token.token_line);
+                                *token_cnt += 1;
+                                return false;
+                            }
                             *token_cnt += 1;
                             return true;
                           }
@@ -438,16 +465,19 @@ bool translate_undef_token(translator *const my_asm, int *const token_cnt)
     assert(token_cnt != nullptr);
     assert(cur_token.type == UNDEF_TOKEN);
 
-    if (get_label_pc(my_asm, token_cnt) != -1)
+    int cur_label_pc = get_label_pc(my_asm, token_cnt);
+    if (cur_label_pc != -1 && cur_label_pc != my_asm->cpu.pc)
     {
         fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "redefined label\n", cur_token.token_line);
         *token_cnt += 1;
         return false;
     }
-    label_store_push(&my_asm->link, *token_cnt, my_asm->cpu.pc);
+    if (cur_label_pc == -1)
+    {
+        label_store_push(&my_asm->link, *token_cnt, my_asm->cpu.pc);
+        check_inside
+    }
     *token_cnt += 1;
-    check_inside
-
     if (cur_token.type == KEY_CHAR && cur_token.value.key == ':')
     {
         *token_cnt += 1;
@@ -553,7 +583,7 @@ int get_label_pc(const translator *const my_asm, int *const token_cnt)
         if (cur_label_token.value.token_len == cur_token.value.token_len)
         {
             if (!strncasecmp(my_asm->buff_data+      cur_token.token_beg,
-                             my_asm->buff_data+cur_label_token.token_beg, (size_t) cur_token.value.token_len))
+                             my_asm->buff_data+cur_label_token.token_beg, (size_t) cur_token.value.token_len-1))
             {
                 return cur_label_pc;
             }
@@ -855,6 +885,38 @@ void skip_source_spaces(source *const code)
 /*===========================================================================================================================*/
 // DUMP
 /*===========================================================================================================================*/
+
+void label_text_dump(const label_store *const link)
+{
+    if (link == nullptr)
+    {
+        log_warning("link to dump is nullptr(%d)\n", __LINE__);
+        return;
+    }
+
+    log_message("\n"
+                "link\n"
+                "{\n"
+                "    store   =%p\n"
+                "    size    =%d\n"
+                "    capacity=%d\n"
+                "}\n",
+                link->store, link->size, link->capacity);
+    
+    log_message("link.store:\n\n"
+                "     index:");
+    for (int i = 0; i < link->size; ++i) log_message("%5d ", i);
+    
+    log_message("\n"
+                " token_num:");
+    for (int i = 0; i < link->size; ++i) log_message("%5d ", link->store[i].token_num);
+
+    log_message("\n"
+                "        pc:");
+    for (int i = 0; i < link->size; ++i) log_message("%5d ", link->store[i].pc);
+
+    log_message("\n\n");
+}
 
 void lexis_text_dump(const source *const code)
 {

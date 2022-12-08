@@ -96,7 +96,7 @@ static const char *ASM_CMD_NAMES[] =
     "UNDEF_ASM_CMD" ,
 };
 
-enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         4 bit         |
+enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         5 bit         |
 {                       //----------------+-----------+-----------+-----------------------+----
     PARAM_INT = 5   ,   //    | PARAM_MEM | PARAM_REG | PARAM_INT |        ASM_CMD        |
     PARAM_REG = 6   ,   //----------------+-----------+-----------+-----------------------+----
