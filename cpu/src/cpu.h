@@ -110,7 +110,7 @@ enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         5 bi
 struct executer
 {
     void *cmd;          // массив, содержащий инструкции и параметры исполнителя(бинарный код)
-    int   capcity;      // емкость .cmd
+    int   capacity;     // емкость .cmd
     int   pc;           // program counter(он же размер .cmd)
 };
 
@@ -128,6 +128,7 @@ void executer_dtor(executer *const cpu);
 // EXTRA EXECUTER FUNCTION
 /*===========================================================================================================================*/
 
-void executer_add_cmd (executer *const cpu, const void *const cmd, const size_t cmd_size);
+void executer_add_cmd  (executer *const cpu, const void *const cmd, const size_t cmd_size);
+void executer_pull_cmd (executer *const cpu, void *const   pull_in, const size_t pull_size);
 
 #endif //CPU
