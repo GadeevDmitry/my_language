@@ -10,7 +10,6 @@
 #include "../../lib/algorithm/algorithm.h"
 #include "../../lib/graphviz_dump/graphviz_dump.h"
 
-#include "dsl.h"
 #include "cpu.h"
 #include "terminal_colors.h"
 
@@ -34,6 +33,22 @@ void executer_ctor(executer *const cpu, const int size)
     cpu->cmd     = log_calloc((size_t) size, sizeof(cpu_type));
     cpu->capcity = size;
     cpu->pc      = 0;
+}
+
+bool executer_ctor(executer *const cpu, const char *execute_file)
+{
+    assert(cpu          != nullptr);
+    assert(execute_file != nullptr);
+
+    cpu->cmd = read_file(execute_file, &cpu->capcity);
+    cpu->pc  = 0;
+
+    if (cpu->cmd == nullptr)
+    {
+        log_error("can't open execute file \"%s\"(%d)\n", execute_file, __LINE__);
+        return false;
+    }
+    return true;
 }
 
 void executer_dtor(executer *const cpu)

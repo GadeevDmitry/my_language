@@ -120,6 +120,8 @@ struct executer
 
 void executer_ctor(executer *const cpu);
 void executer_ctor(executer *const cpu, const int size);
+bool executer_ctor(executer *const cpu, const char *execute_file);
+
 void executer_dtor(executer *const cpu);
 
 /*===========================================================================================================================*/

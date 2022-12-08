@@ -12,7 +12,6 @@
 #include "../../lib/algorithm/algorithm.h"
 #include "../../lib/graphviz_dump/graphviz_dump.h"
 
-#include "dsl.h"
 #include "terminal_colors.h"
 #include "assembler.h"
 
