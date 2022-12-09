@@ -39,8 +39,8 @@ int main(const int argc, const char *argv[])
     }
 
     lexical_analyzer   (code);
-  //lexis_text_dump    (code);
-  //lexis_graphviz_dump(code);
+    lexis_text_dump    (code);
+    lexis_graphviz_dump(code);
 
     translator my_asm = {};
 
@@ -246,7 +246,7 @@ bool translate_pop(translator *const my_asm, int *const token_cnt)
 
     if (cur_token.type == UNDEF_TOKEN)
     {
-        if (cur_token.value.token_len == 5 &&                 // "void": 4 characters + 1 null-character
+        if (cur_token.value.token_len == 5 &&                // "void": 4 characters + 1 null-character
             !strncasecmp(my_asm->buff_data+cur_token.token_beg, "void", 4))
         {
             executer_add_cmd(&my_asm->cpu, &cmd, sizeof(unsigned char));
@@ -772,6 +772,8 @@ ASM_CMD get_asm_cmd(const char *cur_token)
 
 bool is_key_char(const char char_to_check)
 {
+    if (char_to_check == '\0') return true;
+
     for (int i = 0; KEY_CHARS[i] != '\0'; ++i)
     {
         if (char_to_check == KEY_CHARS[i]) return true;
