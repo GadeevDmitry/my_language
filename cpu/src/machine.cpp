@@ -96,7 +96,7 @@ bool execute(machine *const computer)
 #define check_empty(stack_name, instruction_name)                                                                           \
   if (stack_empty(&$##stack_name))                                                                                            \
   {                                                                                                                         \
-      fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL #stack_name "is empty\n", #instruction_name); \
+      fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL #stack_name " is empty\n", #instruction_name); \
       return false;                                                                                                         \
   }
 
