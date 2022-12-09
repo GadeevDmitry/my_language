@@ -39,8 +39,8 @@ int main(const int argc, const char *argv[])
     }
 
     lexical_analyzer   (code);
-    lexis_text_dump    (code);
-    lexis_graphviz_dump(code);
+  //lexis_text_dump    (code);
+  //lexis_graphviz_dump(code);
 
     translator my_asm = {};
 
