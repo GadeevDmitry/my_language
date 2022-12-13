@@ -1,9 +1,14 @@
 #ifndef FRONTEND
 #define FRONTEND
 
+#include "ast.h"
+#include "../lib/stack/stack.h"
+
 //===========================================================================================================================
 // DSL
 //===========================================================================================================================
+
+//_____________________________________________________LEXICAL_ANALYSIS______________________________________________________
 
 #define buff_data        code->buff.data
 #define buff_size        code->buff.size
@@ -19,6 +24,9 @@
 #define key_char_val     value.key_char
 #define int_num_val      value.int_num
 #define token_len_val    value.token_len
+
+#define $cur_token       lexis_data[*token_cnt]
+#define $next_token      lexis_data[*token_cnt + 1]
 
 //===========================================================================================================================
 // CONST
@@ -47,13 +55,13 @@ static const char *KEY_CHAR_NAMES     = ";," "(){}" "+-*/^" "!=><" "|&" "#";
 
 static const char *KEY_WORD_NAMES[]   =
 {
-    "BARCELONA"         ,
-    "MESSI"             ,
-    "SUAREZ"            ,
-    "NEYMAR"            ,
-    "CHAMPIONS_LEAGUE"  ,
-    "ARGENTINA"         ,
-    "PORTUGAL"          ,
+    "BARCELONA"         ,   // int
+    "MESSI"             ,   // if
+    "SUAREZ"            ,   // else
+    "NEYMAR"            ,   // while
+    "CHAMPIONS_LEAGUE"  ,   // return
+    "ARGENTINA"         ,   // input
+    "PORTUGAL"          ,   // output
 };
 enum KEY_WORD_TYPE
 {
@@ -68,7 +76,12 @@ enum KEY_WORD_TYPE
 
 static const char *KEY_CHAR_DOUBLE_NAMES[] = 
 {
-    "==", "!=", ">=", "<=", "&&", "||",
+    "GOAL"              ,   // ==
+    "NO_GOAL"           ,   // !=
+    "GOAL_INSIDE"       ,   // >=
+    "GOAL_OFFSIDE"      ,   // <=
+    "GOAL_PLUS_ASSIST"  ,   // &&
+    "GOAL_OR_ASSIST"    ,   // ||
 };
 enum KEY_CHAR_DOUBLE_TYPE
 {
@@ -84,48 +97,6 @@ const char *LEXIS_GRAPHVIZ_HEADER = "digraph {\n"
                                     //"rankdir=LR\n"
                                     "splines=ortho\n"
                                     "node[shape=record, style=\"rounded, filled\", fontsize=8]\n";
-
-//____________________________________________________________AST____________________________________________________________
-
-enum AST_NODE_TYPE
-{
-    FICTIONAL   ,
-    NUMBER      ,
-    VARIABLE    ,
-    OP_IF       ,
-    IF_ELSE     ,
-    OP_WHILE    ,
-    OPERATOR    ,
-    VAR_DECL    ,
-    FUNC_CALL   ,
-    FUNC_DECL   ,
-    OP_RETURN   ,
-};
-
-enum OPERATOR_TYPE
-{
-    OP_ADD = 1      ,
-    OP_SUB          ,
-    OP_MUL          ,
-    OP_DIV          ,
-    OP_POW          ,
-
-    OP_INPUT        ,
-    OP_OUTPUT       ,
-
-    OP_EQUAL        ,
-    OP_ABOVE        ,
-    OP_BELOW        ,
-    OP_ABOVE_EQUAL  ,
-    OP_BELOW_EQUAL  ,
-    OP_NOT_EQUAL    ,
-    OP_NOT          ,
-
-    OP_OR           ,
-    OP_AND          ,
-
-    ASSIGNMENT      ,
-};
 
 //===========================================================================================================================
 // STRUCT
@@ -169,52 +140,79 @@ struct source
     lexis;
 };
 
-//____________________________________________________________AST____________________________________________________________
+//____________________________________________________SYNTACTIC_ANALYSIS_____________________________________________________
 
-struct AST_node
+struct var_info         // структура с информацией о переменной
 {
-    AST_NODE_TYPE type;
-    union
-    {
-        int         fictional;  // фиктивное значение                               .type = FICTIONAL, OP_IF, IF_ELSE, OP_WHILE, OP_RETURN
-        int           int_num;  // значение числа                                   .type = NUMBER
-        int         var_index;  // индекс имени переменной в списке имен переменных .type = VARIABLE, VAR_DECL
-        int        func_index;  // индекс имени функции    в списке имен функций    .type = FUNC_CALL, FUNC_DECL
-        OPERATOR_TYPE op_type;  // тип оператора                                    .type = OPERATOR
-    }
-    value;
-
-    AST_node *left;             // указатель на левого сына
-    AST_node *right;            // указатель на правого сына
-    AST_node *prev;             // указатель на родителя
+    const char *name;   // имя переменной
+    stack      scope;   // стек с номерами обласстей видимости, в которых обЪявлена переменная с именем .name
 };
 
+struct var_name_list    // список имен переменных
+{
+    var_info *var;      // массив структур с переменными
+    int      size;      // размер массива
+    int  capacity;      // емкость массива
+};
+
+struct arg_list         // структура с аргументами функции
+{
+    int *name_index;    // массив индексов аргументов в списке имен переменных
+    int        size;    // размер массива
+    int    capacity;    // емкость массива
+};
+
+struct func_info        // структура с информацией о функции
+{
+    const char *name;   // имя функции
+    arg_list    args;   // структура с аргументами данной функции
+};
+
+struct func_name_list   // список имен функций
+{
+    func_info *func;    // массив структур с функциями
+    int        size;    // размер массива
+    int    capacity;    // емкость массива
+};
+
+//____________________________________________________SYNTACTIC_ANALYSIS_____________________________________________________
+
 //===========================================================================================================================
-// AST_NODE_CTOR_DTOR
+// VAR_NAME_LIST_CTOR_DTOR
 //===========================================================================================================================
 
-#define AST_NODE_CTOR_DECLARATION(ast_node_type, value_field_type)                                                          \
-                                                                                                                            \
-void AST_node_##ast_node_type##_ctor(AST_node *const node, const value_field_type value, AST_node *const left  = nullptr,   \
-                                                                                         AST_node *const right = nullptr,   \
-                                                                                         AST_node *const prev  = nullptr);
+void var_name_list_ctor (var_name_list *const var_store);
+void var_name_list_dtor (var_name_list *const var_store);
 
-AST_NODE_CTOR_DECLARATION(FICTIONAL, int);
-AST_NODE_CTOR_DECLARATION(NUMBER   , int);
-AST_NODE_CTOR_DECLARATION(VARIABLE , int);
-AST_NODE_CTOR_DECLARATION(OP_IF    , int);
-AST_NODE_CTOR_DECLARATION(IF_ELSE  , int);
-AST_NODE_CTOR_DECLARATION(OP_WHILE , int);
-AST_NODE_CTOR_DECLARATION(OPERATOR , OPERATOR_TYPE);
-AST_NODE_CTOR_DECLARATION(VAR_DECL , int);
-AST_NODE_CTOR_DECLARATION(FUNC_CALL, int);
-AST_NODE_CTOR_DECLARATION(FUNC_DECL, int);
-AST_NODE_CTOR_DECLARATION(OP_RETURN, int);
+void var_info_ctor (var_info *const var, const source *const code, const token *const cur_token, const int scope = -1);
+void var_info_dtor (var_info *const var);
 
-#undef AST_NODE_DECLARATION
+//===========================================================================================================================
+// FUNC_NAME_LIST_CTOR_DTOR
+//===========================================================================================================================
 
-void AST_node_dtor (AST_node *const node);
-void AST_tree_dtor (AST_node *const node);
+void func_name_list_ctor (func_name_list *const func_store);
+void func_name_list_dtor (func_name_list *const func_store);
+
+void func_info_ctor (func_info *const func, const source *const code, const token *const cur_token);
+void func_info_dtor (func_info *const func);
+
+void arg_list_ctor (arg_list *const arg_store);
+void arg_list_dtor (arg_list *const arg_store);
+
+//===========================================================================================================================
+// BOOL TOKEN_...
+//===========================================================================================================================
+
+bool token_int    (const token cur_token);
+bool token_if     (const token cur_token);
+bool token_else   (const token cur_token);
+bool token_while  (const token cur_token);
+bool token_return (const token cur_token);
+bool token_input  (const token cur_token);
+bool token_output (const token cur_token);
+
+//_____________________________________________________LEXICAL_ANALYSIS______________________________________________________
 
 //===========================================================================================================================
 // SOURCE_CTOR_DTOR
@@ -229,23 +227,23 @@ void    source_dtor (source *const code);
 // LEXICAL_ANALYSIS
 //===========================================================================================================================
 
-void lexical_analyzer  (source *const code);
+void lexical_analyzer    (source *const code);
 
-int  get_another_token (source *const code);
-bool get_key_word_type (source *const code, const int token_beg, const int token_len, KEY_WORD_TYPE        *const type = nullptr);
-bool key_double_char   (source *const code,                                           KEY_CHAR_DOUBLE_TYPE *const type = nullptr);
-bool get_int_num       (source *const code, const int token_beg, const int token_len, int           *const num  = nullptr);
-bool comment           (source *const code);
+int  get_another_token   (source *const code);
+bool get_key_word_type   (source *const code, const int token_beg, const int token_len, KEY_WORD_TYPE        *const type = nullptr);
+bool get_key_double_char (source *const code, const int token_beg, const int token_len, KEY_CHAR_DOUBLE_TYPE *const type = nullptr);
+bool get_int_num         (source *const code, const int token_beg, const int token_len, int                  *const num  = nullptr);
+bool comment             (source *const code);
 
-bool key_char          (const char to_check);
-bool split_char        (const char to_check);
+bool key_char            (const char to_check);
+bool split_char          (const char to_check);
 
 //===========================================================================================================================
 // TOKEN_CTOR_DTOR
 //===========================================================================================================================
 
 void create_key_word_token        (source *const code, const int token_beg, const int token_len);
-void create_key_double_char_token (source *const code);
+void create_key_double_char_token (source *const code, const int token_beg, const int token_len);
 void create_key_char_token        (source *const code);
 void create_int_num_token         (source *const code, const int token_beg, const int token_len);
 void create_undef_token           (source *const code, const int token_beg, const int token_len);

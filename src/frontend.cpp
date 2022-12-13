@@ -8,12 +8,10 @@
 #include "../lib/logs/log.h"
 #include "../lib/read_write/read_write.h"
 #include "../lib/algorithm/algorithm.h"
-#include "../lib/stack/stack.h"
 #include "../lib/graphviz_dump/graphviz_dump.h"
 
 #include "frontend.h"
 #include "terminal_colors.h"
-#include "name_list.h"
 
 /*
 //===========================================================================================================================
@@ -132,58 +130,182 @@ int main(const int argc, const char *argv[])
 }
 
 //===========================================================================================================================
+// VAR_NAME_LIST_CTOR_DTOR
+//===========================================================================================================================
+
+void var_name_list_ctor(var_name_list *const var_store)
+{
+    assert(var_store != nullptr);
+
+    var_store->size     = 0;
+    var_store->capacity = 4;    //default capacity
+    var_store->var      = (var_info *) log_calloc(2, sizeof(var_info));
+}
+
+void var_name_list_dtor(var_name_list *const var_store)
+{
+    assert(var_store != nullptr);
+
+    for (int i = 0; i < var_store->size; ++i) var_info_dtor(var_store->var+i);
+    log_free(var_store->var);
+
+    var_store->var      = nullptr;
+    var_store->size     = 0;
+    var_store->capacity = 0;
+}
+
+void var_info_ctor(var_info *const var, const source *const code, const token *const cur_token, const int scope = -1)
+{
+    assert(var       != nullptr);
+    assert(code      != nullptr);
+    assert(cur_token != nullptr);
+
+    assert(cur_token->type == UNDEF_TOKEN);
+
+    const char *name_beg = buff_data + cur_token->token_beg;
+    const int   name_len =             cur_token->token_len_val;
+
+    var->name  = strndup(name_beg, name_len);
+    stack_ctor(&var->scope, sizeof(int));
+
+    if (scope != -1) stack_push(&var->scope, &scope);
+}
+
+void var_info_dtor(var_info *const var)
+{
+    assert(var != nullptr);
+
+    log_free  ((char *)var->name);
+    stack_dtor(&var->scope);
+}
+
+//===========================================================================================================================
+// VAR_NAME_LIST USER
+//===========================================================================================================================
+
+int var_name_list_add_var(var_name_list *const var_store, const source *const code, const token *cur_token, const int scope)
+{
+    assert(var_store != nullptr);
+    assert(code      != nullptr);
+    assert(cur_token != nullptr);
+
+}
+
+void var_info_push_scope(var_info *const var, const int scope)
+{
+    assert(var != nullptr);
+
+    stack_push(&var->scope, &scope);
+}
+
+//===========================================================================================================================
+// FUNC_NAME_LIST_CTOR_DTOR
+//===========================================================================================================================
+
+void func_name_list_ctor(func_name_list *const func_store)
+{
+    assert(func_store != nullptr);
+
+    func_store->size     = 0;
+    func_store->capacity = 4;   //default capacity
+    func_store->func     = (func_info *) log_calloc(4, sizeof(func_info));
+}
+
+void func_name_list_dtor(func_name_list *const func_store)
+{
+    for (int i = 0; i < func_store->size; ++i) func_info_dtor(func_store->func+i);
+    log_free(func_store->func);
+
+    func_store->func     = nullptr;
+    func_store->size     = 0;
+    func_store->capacity = 0;
+}
+
+void func_info_ctor(func_info *const func, const source *const code, const token *const cur_token)
+{
+    assert(func      != nullptr);
+    assert(code      != nullptr);
+    assert(cur_token != nullptr);
+
+    assert(cur_token->type == UNDEF_TOKEN);
+
+    const char *name_beg = buff_data + cur_token->token_beg;
+    const int   name_len =             cur_token->token_len_val;
+
+    func->name = strndup(name_beg, name_len);
+    arg_list_ctor(&func->args);
+}
+
+void func_info_dtor(func_info *const func)
+{
+    assert(func != nullptr);
+
+    log_free     ((char *) func->name);
+    arg_list_dtor(&func->args);
+}
+
+void arg_list_ctor(arg_list *const arg_store)
+{
+    assert(arg_store != nullptr);
+
+    arg_store->size       = 0;
+    arg_store->capacity   = 4;
+    arg_store->name_index = (int *) log_calloc(4, sizeof(int));
+}
+
+void arg_list_dtor(arg_list *const arg_store)
+{
+    assert(arg_store != nullptr);
+
+    log_free(arg_store->name_index);
+
+    arg_store->name_index = nullptr;
+    arg_store->capacity   = 0;
+    arg_store->size       = 0;
+}
+
+//===========================================================================================================================
 // TRANSLATOR
 //===========================================================================================================================
 
-
-
 //===========================================================================================================================
-// AST_NODE_CTOR_DTOR
+// BOOL TOKEN_...
 //===========================================================================================================================
 
-#define AST_NODE_CTOR(union_value_field, value_field_type, ast_node_type)                                                   \
-                                                                                                                            \
-void AST_node_##ast_node_type##_ctor(AST_node *const node, const value_field_type value, AST_node *const left ,             \
-                                                                                         AST_node *const right,             \
-                                                                                         AST_node *const prev )             \
-{                                                                                                                           \
-    assert(node != nullptr);                                                                                                \
-                                                                                                                            \
-    node->type        = ast_node_type;                                                                                      \
-    union_value_field = value;                                                                                              \
-                                                                                                                            \
-    node->left        = left;                                                                                               \
-    node->right       = right;                                                                                              \
-    node->prev        = prev;                                                                                               \
-}
+bool token_int    (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == INT   ; }
+bool token_if     (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == IF    ; }
+bool token_else   (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == ELSE  ; }
+bool token_while  (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == WHILE ; }
+bool token_return (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == RETURN; }
+bool token_input  (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == INPUT ; }
+bool token_output (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == OUTPUT; }
 
-AST_NODE_CTOR(node->value.fictional ,           int, FICTIONAL)
-AST_NODE_CTOR(node->value.int_num   ,           int, NUMBER   )
-AST_NODE_CTOR(node->value.var_index ,           int, VARIABLE )
-AST_NODE_CTOR(node->value.fictional ,           int, OP_IF    )
-AST_NODE_CTOR(node->value.fictional ,           int, IF_ELSE  )
-AST_NODE_CTOR(node->value.fictional ,           int, OP_WHILE )
-AST_NODE_CTOR(node->value.op_type   , OPERATOR_TYPE, OPERATOR )
-AST_NODE_CTOR(node->value.var_index ,           int, VAR_DECL )
-AST_NODE_CTOR(node->value.func_index,           int, FUNC_CALL)
-AST_NODE_CTOR(node->value.func_index,           int, FUNC_DECL)
-AST_NODE_CTOR(node->value.fictional ,           int, OP_RETURN)
+//===========================================================================================================================
+// AST_NODE EXTRA FUNCTION
+//===========================================================================================================================
 
-#undef AST_NODE_CTOR
-
-void AST_node_dtor(AST_node *const node)
+//подвешивает subtree к main_tree, используя фиктивные вершины
+void merge_tree(AST_node *const main_tree, AST_node *const subtree)
 {
-    log_free(node);
-}
+    assert(main_tree != nullptr);
+    assert(subtree   != nullptr);
 
-void AST_tree_dtor(AST_node *const node)
-{
-    if (node == nullptr) return;
+    assert(main_tree->type == FICTIONAL);
+    assert(subtree  ->type != FICTIONAL);
 
-    AST_tree_dtor(node->left);
-    AST_tree_dtor(node->right);
-    AST_node_dtor(node);
-
+    if (main_tree->left == nullptr)
+    {
+        main_tree->left = subtree;
+        subtree  ->prev = main_tree;
+        return;
+    }
+    if (main_tree->right == nullptr)
+    {
+        main_tree->right = new_FICTIONAL_AST_node(0, subtree, nullptr, main_tree);
+        subtree  ->prev  = main_tree->right;
+        return;
+    }
+    merge_tree(main_tree->right, subtree);
 }
 
 //===========================================================================================================================
@@ -249,17 +371,17 @@ void lexical_analyzer(source *const code)
 
     while (buff_pos < buff_size && buff_data[buff_pos] != '\0')
     {
-        if      (comment(code)) continue;
-        if      (key_double_char(code))         create_key_double_char_token(code);
-        else if (key_char(buff_data[buff_pos])) create_key_char_token       (code);
+        if (comment(code)) continue;
+        if (key_char(buff_data[buff_pos])) create_key_char_token(code);
         else
         {
             int token_beg = buff_pos;
             int token_len = get_another_token(code);
 
-            if      (get_int_num      (code, token_beg, token_len)) create_int_num_token (code, token_beg, token_len);
-            else if (get_key_word_type(code, token_beg, token_len)) create_key_word_token(code, token_beg, token_len);
-            else                                                    create_undef_token   (code, token_beg, token_len);
+            if      (get_int_num        (code, token_beg, token_len)) create_int_num_token        (code, token_beg, token_len);
+            else if (get_key_double_char(code, token_beg, token_len)) create_key_double_char_token(code, token_beg, token_len);
+            else if (get_key_word_type  (code, token_beg, token_len)) create_key_word_token       (code, token_beg, token_len);
+            else                                                      create_undef_token          (code, token_beg, token_len);
         }
         skip_source_spaces(code);
     }
@@ -292,16 +414,14 @@ bool get_key_word_type(source *const code, const int token_beg, const int token_
     }
     return false;
 }
-                                                           //default type = nullptr
-bool key_double_char(source *const code, KEY_CHAR_DOUBLE_TYPE *const type)
+                                                                                                        // default type = nullptr
+bool get_key_double_char(source *const code, const int token_beg, const int token_len, KEY_CHAR_DOUBLE_TYPE *const type)
 {
     assert(code != nullptr);
 
-    if (buff_pos + 2 > buff_size) return false;
-
     for (size_t i = 0; i * sizeof(char *) < sizeof(KEY_CHAR_DOUBLE_NAMES); ++i)
     {
-        if (!strncmp(KEY_CHAR_DOUBLE_NAMES[i], buff_data+buff_pos, 2))
+        if (!strncmp(KEY_CHAR_DOUBLE_NAMES[i], buff_data + token_beg, (size_t)token_len))
         {
             if (type != nullptr) *type = (KEY_CHAR_DOUBLE_TYPE) i;
             return true;
@@ -382,16 +502,16 @@ void create_key_char_token(source *const code)
     ++lexis_pos;
 }
 
-void create_key_double_char_token(source *const code)
+void create_key_double_char_token(source *const code, const int token_beg, const int token_len)
 {
     assert(code != nullptr);
 
     lexis_data[lexis_pos].type          = KEY_CHAR_DOUBLE;
-    lexis_data[lexis_pos].token_beg     = buff_pos;
+    lexis_data[lexis_pos].token_beg     = token_beg;
     lexis_data[lexis_pos].token_line    = buff_line;
 
-    key_double_char(code, &lexis_data[lexis_pos].key_dbl_char_val);
-    ++lexis_pos; buff_pos += 2;
+    get_key_double_char(code, token_beg, token_len, &lexis_data[lexis_pos].key_dbl_char_val);
+    ++lexis_pos;
 }
 
 void create_int_num_token(source *const code, const int token_beg, const int token_len)
@@ -595,7 +715,7 @@ void get_token_value_message(const token *const cur_token, char *const token_val
     {
         case KEY_WORD   :       sprintf(token_value, "word: %s", KEY_WORD_NAMES[cur_token->key_word_val]);
                                 break;
-        case KEY_CHAR_DOUBLE:   sprintf(token_value, "dbl_char: \\\"%s\\\"", KEY_CHAR_DOUBLE_NAMES[cur_token->key_dbl_char_val]);
+        case KEY_CHAR_DOUBLE:   sprintf(token_value, "dbl_char: %s", KEY_CHAR_DOUBLE_NAMES[cur_token->key_dbl_char_val]);
                                 break;
         case KEY_CHAR   :       if      (cur_token->key_char_val == '{') sprintf(token_value, "char: opened fig");
                                 else if (cur_token->key_char_val == '}') sprintf(token_value, "char: closed fig");
