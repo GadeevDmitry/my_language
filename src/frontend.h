@@ -28,6 +28,10 @@
 #define $cur_token       lexis_data[*token_cnt]
 #define $next_token      lexis_data[*token_cnt + 1]
 
+#define $var_store      name_store->var_store
+#define $func_store     name_store->func_store
+#define $scope          name_store->scope
+
 //===========================================================================================================================
 // CONST
 //===========================================================================================================================
@@ -60,8 +64,8 @@ static const char *KEY_WORD_NAMES[]   =
     "SUAREZ"            ,   // else
     "NEYMAR"            ,   // while
     "CHAMPIONS_LEAGUE"  ,   // return
-    "ARGENTINA"         ,   // input
-    "PORTUGAL"          ,   // output
+    "CHECK_BEGIN"       ,   // input
+    "CHECK_OVER"        ,   // output
 };
 enum KEY_WORD_TYPE
 {
@@ -93,10 +97,10 @@ enum KEY_CHAR_DOUBLE_TYPE
     OR          ,
 };
 
-const char *LEXIS_GRAPHVIZ_HEADER = "digraph {\n"
-                                    //"rankdir=LR\n"
-                                    "splines=ortho\n"
-                                    "node[shape=record, style=\"rounded, filled\", fontsize=8]\n";
+static const char *LEXIS_GRAPHVIZ_HEADER = "digraph {\n"
+                                         //"rankdir=LR\n"
+                                           "splines=ortho\n"
+                                           "node[shape=record, style=\"rounded, filled\", fontsize=8]\n";
 
 //===========================================================================================================================
 // STRUCT
@@ -154,6 +158,7 @@ struct var_name_list    // список имен переменных
     int      size;      // размер массива
     int  capacity;      // емкость массива
 };
+//---------------------------------------------------------------------------------------------------------------------------
 
 struct arg_list         // структура с аргументами функции
 {
@@ -174,6 +179,15 @@ struct func_name_list   // список имен функций
     int        size;    // размер массива
     int    capacity;    // емкость массива
 };
+//---------------------------------------------------------------------------------------------------------------------------
+
+struct dictionary       // структура, объединяющая списки имен аргументов и функций
+{
+    var_name_list   var_store;
+    func_name_list func_store;
+
+    int scope;
+};
 
 //____________________________________________________SYNTACTIC_ANALYSIS_____________________________________________________
 
@@ -186,6 +200,35 @@ void var_name_list_dtor (var_name_list *const var_store);
 
 void var_info_ctor (var_info *const var, const source *const code, const token *const cur_token, const int scope = -1);
 void var_info_dtor (var_info *const var);
+
+//===========================================================================================================================
+// VAR_NAME_LIST USER
+//===========================================================================================================================
+
+// Добавляет область видимости scope в переменную cur_token (если переменная с данным именем не встречалась ранее, то она создается).
+// Возвращает индекс имени в списке имен var_store
+int  var_name_list_add_var       (var_name_list *const var_store, const source *const code, const token *const cur_token, const int scope);
+
+// Удаляет область видимости scope из всех переменных
+void var_name_list_clear_var     (var_name_list *const var_store,                                                         const int scope);
+
+// Возвращает индекс переменной cur_token в спимке имен var_store, если переменная определена в любой области видимости, и -1 иначе
+int  var_name_list_defined_var(var_name_list *const var_store, const source *const code, const token *const cur_token);
+
+// Возвращает индекс переменной cur_token в списке имен var_store, если она объявлена в текущей области видимости scope, и -1 иначе
+int  var_name_list_redefined_var (var_name_list *const var_store, const source *const code, const token *const cur_token, const int scope);
+
+//===========================================================================================================================
+// VAR_NAME_LIST CLOSED
+//===========================================================================================================================
+
+bool same_var              (const source *const code, var_info *const var, const token *const cur_token);
+
+void var_info_push_scope   (var_info *const var, const int scope);
+void var_info_pop_scope    (var_info *const var, const int scope);
+
+int  var_name_list_new_var (var_name_list *const var_store, const source *const code, const token *const cur_token, const int scope);
+void var_name_list_realloc (var_name_list *const var_store);
 
 //===========================================================================================================================
 // FUNC_NAME_LIST_CTOR_DTOR
@@ -201,8 +244,80 @@ void arg_list_ctor (arg_list *const arg_store);
 void arg_list_dtor (arg_list *const arg_store);
 
 //===========================================================================================================================
+// FUNC_NAME_LIST USER
+//===========================================================================================================================
+
+// Добавляет функцию cur_token в список имен func_store
+// Возвращает индекс имени в списке имен
+int func_name_list_add_func     (func_name_list *const func_store, const source *const code, const token *const cur_token);
+
+//Возвращает индекс функции cur_token в списке имен func_store, если она объявлена, и -1 иначе
+int func_name_list_defined_func (func_name_list *const func_store, const source *const code, const token *const cur_token);
+
+//===========================================================================================================================
+// FUNC_NAME_LIST CLOSED
+//===========================================================================================================================
+
+bool same_func              (const source *const code, func_info *const func, const token *const cur_token);
+void func_name_list_realloc (func_name_list *const func_store);
+
+//===========================================================================================================================
+// DICTIONARY_CTOR_DTOR
+//===========================================================================================================================
+
+void dictionary_ctor (dictionary *const name_store);
+void dictionary_dtor (dictionary *const name_store);
+
+//===========================================================================================================================
+// TRANSLATOR
+//===========================================================================================================================
+
+AST_node *parse_general(const source *const code);
+
+bool parse_var_decl         (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         subtree);
+bool parse_func_decl        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         subtree);
+bool parse_func_args        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         arg_tree);
+
+bool parse_operators        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          op_tree);
+bool parse_op_assignment    (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const   op_assign_tree);
+bool parse_op_input         (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          in_tree);
+bool parse_op_output        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         out_tree);
+
+bool parse_if               (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          if_tree);
+bool parse_else             (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const        else_tree);
+bool parse_while            (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const       while_tree);
+
+bool parse_op_func_call     (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
+bool parse_func_call        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
+bool parse_func_call_param  (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const       param_tree);
+
+bool parse_op_return        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
+
+bool parse_rvalue           (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const      rvalue_tree);
+bool parse_assignment       (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const      assign_tree);
+bool parse_op_or            (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          or_tree);
+bool parse_op_and           (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         and_tree);
+bool parse_op_equal         (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const       equal_tree);
+bool parse_op_compare       (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         cmp_tree);
+bool parse_op_add_sub       (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const     add_sub_tree);
+bool parse_op_mul_div       (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const     mul_div_tree);
+bool parse_op_pow           (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         pow_tree);
+bool parse_op_not           (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         not_tree);
+bool parse_operand          (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          operand);
+bool parse_rvalue_token     (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
+bool parse_lvalue           (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
+
+OPERATOR_TYPE token_to_ast_op_type(const token cur_token);
+
+//===========================================================================================================================
 // BOOL TOKEN_...
 //===========================================================================================================================
+
+bool token_cmp    (const token cur_token);
+bool token_eq     (const token cur_token);
+bool token_mul_div(const token cur_token);
+bool token_add_sub(const token cur_token);
+bool token_pow    (const token cur_token);
 
 bool token_int    (const token cur_token);
 bool token_if     (const token cur_token);
@@ -211,6 +326,17 @@ bool token_while  (const token cur_token);
 bool token_return (const token cur_token);
 bool token_input  (const token cur_token);
 bool token_output (const token cur_token);
+
+bool token_e      (const token cur_token);
+bool token_ne     (const token cur_token);
+bool token_ae     (const token cur_token);
+bool token_be     (const token cur_token);
+bool token_and    (const token cur_token);
+bool token_or     (const token cur_token);
+
+bool token_undef  (const token cur_token);
+
+bool token_char   (const token cur_token, const char cmp);
 
 //_____________________________________________________LEXICAL_ANALYSIS______________________________________________________
 
