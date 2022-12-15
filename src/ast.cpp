@@ -64,8 +64,6 @@ static const char *AST_GRAPHVIZ_HEADER = "digraph {\n"
 static void fprintf_tab            (FILE *const stream, const int tab_shift);
 
 static bool AST_parse_dfs          (const char *buff, const int buff_size, int *const buff_pos, AST_node **const    node);
-static bool get_int_buff           (const char *buff, const int buff_size, int *const buff_pos, int       *const int_num);
-static void skip_ast_spaces        (const char *buff, const int buff_size, int *const buff_pos);
 
 static void do_ast_graphviz_dump   (const AST_node *const node, FILE *const stream, int *const node_num);
 static void graphviz_dump_node     (const AST_node *const node, FILE *const stream,  const int node_num);
@@ -225,6 +223,7 @@ AST_node *AST_parse(const char *buff, const int buff_size, int *const buff_pos)
         return false;
 
 #define check_overflow                                                                                                      \
+        skip_ast_spaces(buff, buff_size, buff_pos);                                                                         \
         if (*buff_pos >= buff_size)                                                                                         \
         {                                                                                                                   \
             fprintf_err("expected '}'\n");                                                                                  \
@@ -238,15 +237,11 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
     assert(node     != nullptr);
     assert(*node    == nullptr);
 
-    skip_ast_spaces(buff, buff_size, buff_pos);
-
-    if (buff[*buff_pos] != '{')
+    if (!get_buff_char(buff, buff_size, buff_pos, '{'))
     {
         fprintf_err("expected '{'\n");
         AST_parse_dfs_err_exit
     }
-    *buff_pos += 1;
-    skip_ast_spaces(buff, buff_size, buff_pos);
 
     int node_type = 0;
     int node_val  = 0;
@@ -256,14 +251,11 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
         fprintf_err("expected node type\n");
         AST_parse_dfs_err_exit
     }
-    skip_ast_spaces(buff, buff_size, buff_pos);
-
     if (!get_int_buff(buff, buff_size, buff_pos, &node_val))
     {
         fprintf_err("expected node value\n");
         AST_parse_dfs_err_exit
     }
-    skip_spaces(buff, buff_size, buff_pos);
 
     switch (node_type)
     {
@@ -282,58 +274,55 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
                         AST_parse_dfs_err_exit
     }
     check_overflow
-    if (buff[*buff_pos] == '}')
-    {
-        *buff_pos += 1;
-        return true;
-    }
+    if (get_buff_char(buff, buff_size, buff_pos, '}')) return true;
 
     AST_node *left  = nullptr;
     AST_node *right = nullptr;
 
     if (!AST_parse_dfs(buff, buff_size, buff_pos, &left)) { AST_parse_dfs_err_exit }
 
-    skip_ast_spaces(buff, buff_size, buff_pos);
     check_overflow
-    if (buff[*buff_pos] != '}')
+    if (get_buff_char(buff, buff_size, buff_pos, '}'))
     {
-        if (!AST_parse_dfs(buff, buff_size, buff_pos, &right)) { AST_parse_dfs_err_exit }
-
-        skip_ast_spaces(buff, buff_size, buff_pos);
-        if (*buff_pos >= buff_size || buff[*buff_pos] != '}')
+        if ((*node)->type == FUNC_DECL) //в этом случае у функции нет аргументов
         {
-            fprintf_err("expected '}'\n");
-            AST_parse_dfs_err_exit
+            (*node)->right =  left;
+            left   ->prev  = *node;
         }
-        (*node)->left  =  left;
-        (*node)->right = right;
-
-        left ->prev = *node;
-        right->prev = *node;
-
+        else
+        {
+            (*node)->left =  left;
+            left   ->prev = *node;
+        }
         return true;
     }
-    *buff_pos += 1;
+    if (!AST_parse_dfs(buff, buff_size, buff_pos, &right)) { AST_parse_dfs_err_exit }
 
-    if ((*node)->type == FUNC_DECL) //в этом случае у функции нет аргументов
+    skip_ast_spaces(buff, buff_size, buff_pos);
+    if (*buff_pos >= buff_size || buff[*buff_pos] != '}')
     {
-        (*node)->right =  left;
-        left   ->prev  = *node;
-        return true;
+        fprintf_err("expected '}'\n");
+        AST_parse_dfs_err_exit
     }
-    (*node)->left =  left;
-    left   ->prev = *node;
+    (*node)->left  =  left;
+    (*node)->right = right;
+
+    left ->prev = *node;
+    right->prev = *node;
+
     return true;
 }
 #undef check_overflow
 #undef AST_parse_dfs_err_exit
 #undef fprintf_err
 
-static bool get_int_buff(const char *buff, const int buff_size, int *const buff_pos, int *const int_num)
+bool get_buff_int(const char *buff, const int buff_size, int *const buff_pos, int *const int_num)
 {
     assert(buff     != nullptr);
     assert(buff_pos != nullptr);
     assert(int_num  != nullptr);
+
+    skip_ast_spaces(buff, buff_size, buff_pos);
 
     *int_num    = 0;
     int num_len = 0;
@@ -345,7 +334,42 @@ static bool get_int_buff(const char *buff, const int buff_size, int *const buff_
     return true;
 }
 
-static void skip_ast_spaces(const char *buff, const int buff_size, int *const buff_pos)
+bool get_buff_char(const char *buff, const int buff_size, int *const buff_pos, const char c)
+{
+    assert(buff     != nullptr);
+    assert(buff_pos != nullptr);
+
+    skip_ast_spaces(buff, buff_size, buff_pos);
+
+    if (*buff_pos == buff_size) return false;
+    if (buff[*buff_pos] == c)
+    {
+        *buff_pos += 1;
+        return true;
+    }
+    return false;
+}
+                                                                                // default _name_beg = nullptr,  _name_len = nullptr
+bool get_ast_word(const char *buff, const int buff_size, int *const buff_pos, const char **_name_beg, int *const _name_len)
+{
+    assert(buff      != nullptr);
+    assert(buff_pos  != nullptr);
+
+    skip_ast_spaces(buff, buff_size, buff_pos);
+    if (*buff_pos == buff_size) return false;
+
+    const char *name_beg = buff + *buff_pos;
+    int         name_len = 0;
+
+    while (*buff_pos < buff_size && !isspace(buff[*buff_pos]) && buff[*buff_pos] != '[') *buff_pos += 1;
+
+    name_len = (buff + *buff_pos) - name_beg + 1;
+
+    if (_name_beg != nullptr) *_name_beg = name_beg;
+    if (_name_len != nullptr) *_name_len = name_len;
+}
+
+void skip_ast_spaces(const char *buff, const int buff_size, int *const buff_pos)
 {
     assert(buff     != nullptr);
     assert(buff_pos != nullptr);
