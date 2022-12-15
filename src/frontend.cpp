@@ -586,6 +586,7 @@ bool parse_func_decl(dictionary *const name_store, const source *const code, int
         fprintf_err($cur_token.token_line, "expected '}' after function operators\n");
         func_decl_err_exit
     }
+    $scope      = 0;
     *token_cnt += 1;
     return true;
 }
