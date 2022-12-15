@@ -293,7 +293,7 @@ void dictionary_dtor (dictionary *const name_store);
 // TRANSLATOR
 //===========================================================================================================================
 
-AST_node *parse_general(const source *const code, dictionary **const name_store_ptr);
+AST_node *parse_general(const source *const code, dictionary *const name_store_ptr);
 
 bool parse_var_decl         (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         subtree);
 bool parse_func_decl        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         subtree);
