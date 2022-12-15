@@ -31,8 +31,8 @@ enum AST_NODE_TYPE
     OP_WHILE    ,
     OPERATOR    ,
     VAR_DECL    ,
-    FUNC_CALL   ,
     FUNC_DECL   ,
+    FUNC_CALL   ,
     OP_RETURN   ,
 };
 
@@ -133,7 +133,8 @@ void AST_tree_dtor (AST_node *const node);
 // PARSE_CONVERT
 //===========================================================================================================================
 
-void AST_convert (const AST_node *const node, FILE *const stream, const int tab_shift = 0);
+AST_node *AST_parse   (const char *buff, const int buff_size, int *const buff_pos);
+void      AST_convert (const AST_node *const node, FILE *const stream, const int tab_shift = 0);
 
 //===========================================================================================================================
 // DUMP
