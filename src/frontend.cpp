@@ -35,20 +35,21 @@ var_declaration = "BARCELONA" var_name ';'
 // op_function_call:     return none
 //===========================================================================================================================
 
-function_declaration = "BARCELONA" func_name '(' {var_name {',' var_name}*}? ')' '{' operators '}'
+function_declaration = "BARCELONA" func_name '(' args ')' '{' operators '}'
                                 // func_name - имя новой функции
 
-function_call        = func '(' {rvalue {',' rvalue}*}? ')'
+function_call        = func '(' param ')'
                     // func - имя существующей функции
 
 op_function_call     = function_call ';'
-
+args                 = {var_name {',' var_name}*}?
+param                = {rvalue   {',' rvalue  }*}?
+    
 //===========================================================================================================================
-// operator: return none
+// operators: return none
 //===========================================================================================================================
 
-operator   = var_declaration | op_assignment | op_input | op_output | if | while | op_function_call | op_return
-opearators = {operator}*
+operators   = {var_declaration | op_assignment | op_input | op_output | if | while | op_function_call | op_return}*
 
 //===========================================================================================================================
 // op_assignment: return none
@@ -61,14 +62,15 @@ op_assignment = lvalue '=' rvalue ';'
 // op_output: return none
 //===========================================================================================================================
 
-op_input  = "ARGENTINA" lvalue ';'
-op_output = "POTUGAL"   rvalue ';'
+op_input  = "CHECK_BEGIN" lvalue ';'
+op_output = "CHECK_OVER"  rvalue ';'
 
 //===========================================================================================================================
 // if: return none
 //===========================================================================================================================
 
-if = "MESSI" '(' rvalue ')' '{' operators '}' {"SUAREZ" '{' operators '}'}?
+if   = "MESSI" '(' rvalue ')' '{' operators '}' else?
+else = "SUAREZ" '{' operators '}'
 
 //===========================================================================================================================
 // while: return none
@@ -86,7 +88,8 @@ op_return = "CHAMPIONS_LEAGUE" rvalue ';'
 // rvalue: return value of expretion
 //===========================================================================================================================
 
-rvalue       = {lvalue '='}* op_or
+rvalue       =  assignment? op_or
+assignment   = (lvalue '=')+
 op_or        = op_and     {'||'        op_and    }*
 op_and       = op_equal   {'&&'        op_equal  }*
 op_equal     = op_compare {[== !=]     op_compare}?
@@ -104,7 +107,7 @@ number       = ['0'-'9']+
 // lvalue: return value of variable
 //===========================================================================================================================
 
-        //var - имя существующей переменной
+       //var - имя существующей переменной
 lvalue = var
 */
 
@@ -124,9 +127,15 @@ int main(const int argc, const char *argv[])
     source_text_dump(code);
 
     lexical_analyzer   (code);
+    log_message("lexis dump:\n");
     lexis_graphviz_dump(code);
 
-    source_dtor(code);
+    AST_node *root = parse_general(code);
+    log_message("AST dump:\n");
+    AST_tree_graphviz_dump(root);
+
+    AST_tree_dtor(root);
+    source_dtor  (code);
 }
 
 //===========================================================================================================================
@@ -139,7 +148,7 @@ void var_name_list_ctor(var_name_list *const var_store)
 
     var_store->size     = 0;
     var_store->capacity = 4;    //default capacity
-    var_store->var      = (var_info *) log_calloc(2, sizeof(var_info));
+    var_store->var      = (var_info *) log_calloc(4, sizeof(var_info));
 }
 
 void var_name_list_dtor(var_name_list *const var_store)
@@ -154,7 +163,7 @@ void var_name_list_dtor(var_name_list *const var_store)
     var_store->capacity = 0;
 }
 
-void var_info_ctor(var_info *const var, const source *const code, const token *const cur_token, const int scope = -1)
+void var_info_ctor(var_info *const var, const source *const code, const token *const cur_token, const int scope)
 {
     assert(var       != nullptr);
     assert(code      != nullptr);
@@ -165,7 +174,8 @@ void var_info_ctor(var_info *const var, const source *const code, const token *c
     const char *name_beg = buff_data + cur_token->token_beg;
     const int   name_len =             cur_token->token_len_val;
 
-    var->name  = strndup(name_beg, name_len);
+    var->name     = strndup(name_beg, (size_t) name_len);
+    var->name_len = name_len;
     stack_ctor(&var->scope, sizeof(int));
 
     if (scope != -1) stack_push(&var->scope, &scope);
@@ -175,8 +185,10 @@ void var_info_dtor(var_info *const var)
 {
     assert(var != nullptr);
 
-    log_free  ((char *)var->name);
+    free      ((char *)var->name); //не используем log_free, так как выделяли память с помощью strndup, а не log_calloc
     stack_dtor(&var->scope);
+
+    var->name_len = 0;
 }
 
 //===========================================================================================================================
@@ -250,7 +262,10 @@ bool same_var(const source *const code, var_info *const var, const token *const 
 
     assert(cur_token->type == UNDEF_TOKEN);
 
-    return var->name[cur_token->token_len_val] == '\0' && !strncmp(var->name, buff_data+cur_token->token_beg, cur_token->token_len_val);
+    const char *name_beg = buff_data+cur_token->token_beg;
+    const int   name_len = cur_token->token_len_val;
+
+    return var->name_len == name_len && !strncmp(var->name, name_beg, (size_t) name_len);
 }
 
 void var_info_push_scope(var_info *const var, const int scope)
@@ -327,7 +342,8 @@ void func_info_ctor(func_info *const func, const source *const code, const token
     const char *name_beg = buff_data + cur_token->token_beg;
     const int   name_len =             cur_token->token_len_val;
 
-    func->name = strndup(name_beg, name_len);
+    func->name     = strndup(name_beg, (size_t) name_len);
+    func->name_len = name_len;
     arg_list_ctor(&func->args);
 }
 
@@ -335,8 +351,10 @@ void func_info_dtor(func_info *const func)
 {
     assert(func != nullptr);
 
-    log_free     ((char *) func->name);
+    free         ((char *) func->name); //не используем log_free, так как выделяли память с помощью strndup, а не log_calloc
     arg_list_dtor(&func->args);
+
+    func->name_len = 0;
 }
 
 void arg_list_ctor(arg_list *const arg_store)
@@ -399,8 +417,11 @@ bool same_func(const source *const code, func_info *const func, const token *con
     assert(cur_token != nullptr);
 
     assert(cur_token->type == UNDEF_TOKEN);
-    
-    return func->name[cur_token->token_len_val] == '\0' && !strncmp(func->name, buff_data+cur_token->token_beg, cur_token->token_len_val);
+
+    const char *name_beg = buff_data + cur_token->token_beg;
+    const int   name_len = cur_token->token_len_val;
+
+    return func->name_len == name_len && !strncmp(func->name, name_beg, (size_t) name_len);
 }
 
 void func_name_list_realloc(func_name_list *const func_store)
@@ -504,18 +525,18 @@ bool parse_var_decl(dictionary *const name_store, const source *const code, int 
 }
 //---------------------------------------------------------------------------------------------------------------------------
 #define func_decl_err_exit                                                                                                  \
-        AST_tree_dtor(*subtree);                                                                                            \
-        *subtree = nullptr;                                                                                                 \
-        *token_cnt = old_token_cnt;                                                                                         \
+        AST_tree_dtor(*func_decl_tree);                                                                                     \
+        *func_decl_tree = nullptr;                                                                                          \
+        *token_cnt      = old_token_cnt;                                                                                    \
         return false;
 
-bool parse_func_decl(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const subtree)
+bool parse_func_decl(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const func_decl_tree)
 {
-    assert(name_store != nullptr);
-    assert(code       != nullptr);
-    assert(token_cnt  != nullptr);
-    assert(subtree    != nullptr);
-    assert(*subtree   == nullptr);
+    assert(name_store      != nullptr);
+    assert(code            != nullptr);
+    assert(token_cnt       != nullptr);
+    assert(func_decl_tree  != nullptr);
+    assert(*func_decl_tree == nullptr);
 
     const int old_token_cnt = *token_cnt;
 
@@ -529,24 +550,44 @@ bool parse_func_decl(dictionary *const name_store, const source *const code, int
         fprintf_err($cur_token.token_line, "redefined function\n");
         func_decl_err_exit
     }
-    *token_cnt += 2;
-    *subtree    = new_FUNC_DECL_AST_node(func_name_list_add_func(&$func_store, code, &$cur_token));
+    *func_decl_tree = new_FUNC_DECL_AST_node(func_name_list_add_func(&$func_store, code, &$cur_token));
+    *token_cnt     += 2;
 
-    AST_node *arg_tree = nullptr;
-    if (parse_func_args(name_store, code, token_cnt, &arg_tree))
+    AST_node *subtree = nullptr;
+
+    if (!parse_func_args(name_store, code, token_cnt, &subtree)) { func_decl_err_exit }
+
+    (*func_decl_tree)->left = subtree;
+    if (subtree != nullptr) subtree->prev = *func_decl_tree;
+    subtree = nullptr;
+
+    if (!token_char($cur_token, ')'))
     {
-        if (token_char($cur_token, ')'))
-        {
-            *token_cnt      += 1;
-            (*subtree)->left =       arg_tree;
-            if (arg_tree != nullptr) arg_tree->prev = *subtree;
-            return true;
-        }
         fprintf_err($cur_token.token_line, "expected ')' after function header\n");
         func_decl_err_exit
     }
-    func_decl_err_exit
-    return false;
+    *token_cnt += 1;
+
+    if (!token_char($cur_token, '{'))
+    {
+        fprintf_err($cur_token.token_line, "expected '{' before function operators\n");
+        func_decl_err_exit
+    }
+    *token_cnt += 1;
+
+    if (!parse_operators(name_store, code, token_cnt, &subtree)) { func_decl_err_exit }
+
+    (*func_decl_tree)->right = subtree;
+    if (subtree != nullptr)    subtree->prev = *func_decl_tree;
+    subtree = nullptr;
+
+    if (!token_char($cur_token, '}'))
+    {
+        fprintf_err($cur_token.token_line, "expected '}' after function operators\n");
+        func_decl_err_exit
+    }
+    *token_cnt += 1;
+    return true;
 }
 #undef  func_decl_err_exit
 #define func_args_err_exit                                                                                                  \
@@ -617,8 +658,8 @@ bool parse_operators(dictionary *const name_store, const source *const code, int
         AST_node *subtree = nullptr;
 
         #define call_parser(parser_name)                                                                                    \
-            if (!##parser_name##(name_store, code, token_cnt, &subtree)) { operators_err_exit }                             \
-            if (subtree != nullptr)                                      { fictional_merge_tree(*op_tree, subtree); continue; }
+            if (! parser_name (name_store, code, token_cnt, &subtree)) { operators_err_exit }                               \
+            if (subtree != nullptr)                                    { fictional_merge_tree(*op_tree, subtree); continue; }
 
         call_parser(parse_var_decl)
         call_parser(parse_op_assignment)
@@ -669,9 +710,10 @@ bool parse_op_assignment(dictionary *const name_store, const source *const code,
     }
     *op_assign_tree = new_OPERATOR_AST_node(ASSIGNMENT, subtree);
     subtree         = nullptr;
-    *token_cnt     += 2;
+    *token_cnt     += 1;
 
     if (!parse_rvalue(name_store, code, token_cnt, &subtree)) { op_assignment_err_exit }
+
     (*op_assign_tree)->right = subtree;
     subtree          ->prev  = *op_assign_tree;
 
@@ -1081,6 +1123,7 @@ bool parse_op_return(dictionary *const name_store, const source *const code, int
 #undef  return_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define rvalue_err_exit                                                                                                     \
+        log_error("error in parse_rvalue: old_token_cnt=%d\n", old_token_cnt);                                            \
         AST_tree_dtor(*rvalue_tree);                                                                                        \
         *rvalue_tree = nullptr;                                                                                             \
         *token_cnt   = old_token_cnt;                                                                                       \
@@ -1093,7 +1136,9 @@ bool parse_rvalue(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt    != nullptr);
     assert(rvalue_tree  != nullptr);
     assert(*rvalue_tree == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_rvalue: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
     AST_node       *subtree = nullptr;
 
@@ -1110,6 +1155,7 @@ bool parse_rvalue(dictionary *const name_store, const source *const code, int *c
 #undef rvalue_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define assignment_err_exit                                                                                                 \
+        log_error("error in parse_assignment: old_token_cnt=%d\n", old_token_cnt);                                        \
         AST_tree_dtor(*assign_tree);                                                                                        \
         *assign_tree = nullptr;                                                                                             \
         *token_cnt   = old_token_cnt;                                                                                       \
@@ -1122,7 +1168,9 @@ bool parse_assignment(dictionary *const name_store, const source *const code, in
     assert(token_cnt    != nullptr);
     assert(assign_tree  != nullptr);
     assert(*assign_tree == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_assignment: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     if (!token_char($next_token, '=')) return true;
 
     const int old_token_cnt = *token_cnt;
@@ -1132,7 +1180,7 @@ bool parse_assignment(dictionary *const name_store, const source *const code, in
 
     if (parse_lvalue(name_store, code, token_cnt, &subtree) && subtree != nullptr)
     {
-        *token_cnt          += 2;
+        *token_cnt          += 1;
         (*assign_tree)->left = subtree;
         subtree       ->prev = *assign_tree;
         subtree              = nullptr;
@@ -1155,6 +1203,7 @@ bool parse_assignment(dictionary *const name_store, const source *const code, in
 #undef assignment_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define or_err_exit                                                                                                         \
+        log_error("error in parse_op_or: old_token_cnt=%d\n", old_token_cnt);                                                \
         AST_tree_dtor(*or_tree);                                                                                            \
         *or_tree   = nullptr;                                                                                               \
         *token_cnt = old_token_cnt;
@@ -1166,7 +1215,9 @@ bool parse_op_or(dictionary *const name_store, const source *const code, int *co
     assert(token_cnt  != nullptr);
     assert(or_tree    != nullptr);
     assert(*or_tree   == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_op_or: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
 
     if (!parse_op_and(name_store, code, token_cnt, or_tree)) return false;
@@ -1184,6 +1235,7 @@ bool parse_op_or(dictionary *const name_store, const source *const code, int *co
 #undef or_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define and_err_exit                                                                                                        \
+        log_error("error in parse_op_and: old_token_cnt=%d\n", old_token_cnt);                                               \
         AST_tree_dtor(*and_tree);                                                                                           \
         *and_tree = nullptr;                                                                                                \
         *token_cnt = old_token_cnt;
@@ -1195,7 +1247,9 @@ bool parse_op_and(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt  != nullptr);
     assert(and_tree   != nullptr);
     assert(*and_tree  == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_op_and: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
 
     if (!parse_op_equal(name_store, code, token_cnt, and_tree)) return false;
@@ -1213,8 +1267,10 @@ bool parse_op_and(dictionary *const name_store, const source *const code, int *c
 #undef and_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define equal_err_exit                                                                                                      \
+        log_error("error in parse_op_equal: old_token_cnt=%d\n", old_token_cnt);                                             \
         AST_tree_dtor(*equal_tree);                                                                                         \
         *equal_tree = nullptr;                                                                                              \
+        *token_cnt  = old_token_cnt;                                                                                        \
         return false;
 
 bool parse_op_equal(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const equal_tree)
@@ -1224,7 +1280,9 @@ bool parse_op_equal(dictionary *const name_store, const source *const code, int 
     assert(token_cnt   != nullptr);
     assert(equal_tree  != nullptr);
     assert(*equal_tree == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_op_equal: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
 
     if (!parse_op_compare(name_store, code, token_cnt, equal_tree)) return false;
@@ -1243,8 +1301,10 @@ bool parse_op_equal(dictionary *const name_store, const source *const code, int 
 #undef equal_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define compare_err_exit                                                                                                    \
+        log_error("error in parse_op_compare: old_token_cnt=%d\n", old_token_cnt);                                           \
         AST_tree_dtor(*cmp_tree);                                                                                           \
-        *cmp_tree = nullptr;                                                                                                \
+        *cmp_tree  = nullptr;                                                                                               \
+        *token_cnt = old_token_cnt;                                                                                         \
         return false;
 
 bool parse_op_compare(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const cmp_tree)
@@ -1254,7 +1314,9 @@ bool parse_op_compare(dictionary *const name_store, const source *const code, in
     assert(token_cnt  != nullptr);
     assert(cmp_tree   != nullptr);
     assert(*cmp_tree  == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_op_compare: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
 
     if (!parse_op_add_sub(name_store, code, token_cnt, cmp_tree)) return false;
@@ -1273,6 +1335,7 @@ bool parse_op_compare(dictionary *const name_store, const source *const code, in
 #undef compare_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define add_sub_err_exit                                                                                                    \
+        log_error("error in parse_op_add_sub: old_token_cnt=%d\n", old_token_cnt);                                           \
         AST_tree_dtor(*add_sub_tree);                                                                                       \
         *add_sub_tree = nullptr;                                                                                            \
         *token_cnt    = old_token_cnt;                                                                                      \
@@ -1285,7 +1348,9 @@ bool parse_op_add_sub(dictionary *const name_store, const source *const code, in
     assert(token_cnt     != nullptr);
     assert(add_sub_tree  != nullptr);
     assert(*add_sub_tree == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_value_op_add_sub: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
 
     if (!parse_op_mul_div(name_store, code, token_cnt, add_sub_tree)) return false;
@@ -1304,6 +1369,7 @@ bool parse_op_add_sub(dictionary *const name_store, const source *const code, in
 #undef add_sub_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define mul_div_err_exit                                                                                                    \
+        log_error("error in parse_op_mul_div: old_token_cnt=%d\n", old_token_cnt);                                        \
         AST_tree_dtor(*mul_div_tree);                                                                                       \
         *mul_div_tree = nullptr;                                                                                            \
         *token_cnt    = old_token_cnt;                                                                                      \
@@ -1316,7 +1382,9 @@ bool parse_op_mul_div(dictionary *const name_store, const source *const code, in
     assert(token_cnt     != nullptr);
     assert(mul_div_tree  != nullptr);
     assert(*mul_div_tree == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_op_mul_div: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
 
     if (!parse_op_pow(name_store, code, token_cnt, mul_div_tree)) return false;
@@ -1335,6 +1403,7 @@ bool parse_op_mul_div(dictionary *const name_store, const source *const code, in
 #undef mul_div_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define pow_err_exit                                                                                                        \
+        log_error("error in parse_op_pow: old_token_cnt=%d\n", old_token_cnt);                                            \
         AST_tree_dtor(*pow_tree);                                                                                           \
         *pow_tree  = nullptr;                                                                                               \
         *token_cnt = old_token_cnt;                                                                                         \
@@ -1347,7 +1416,9 @@ bool parse_op_pow(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt  != nullptr);
     assert(pow_tree   != nullptr);
     assert(*pow_tree  == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_op_pow: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
 
     if (!parse_op_not(name_store, code, token_cnt, pow_tree)) return false;
@@ -1365,6 +1436,7 @@ bool parse_op_pow(dictionary *const name_store, const source *const code, int *c
 #undef pow_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define not_err_exit                                                                                                        \
+        log_error("error in parse_op_not: old_token_cnt=%d\n", old_token_cnt);                                            \
         AST_tree_dtor(*not_tree);                                                                                           \
         *not_tree  = nullptr;                                                                                               \
         *token_cnt = old_token_cnt;                                                                                         \
@@ -1377,7 +1449,9 @@ bool parse_op_not(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt  != nullptr);
     assert(not_tree   != nullptr);
     assert(*not_tree  == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_op_not: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
     AST_node *subtree       = nullptr;
 
@@ -1399,6 +1473,7 @@ bool parse_op_not(dictionary *const name_store, const source *const code, int *c
 #undef not_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define operand_err_exit                                                                                                    \
+        log_error("error in parse_operand: old_token_cnt=%d\n", old_token_cnt);                                           \
         AST_tree_dtor(*operand);                                                                                            \
         *operand   = nullptr;                                                                                               \
         *token_cnt = old_token_cnt;                                                                                         \
@@ -1411,7 +1486,9 @@ bool parse_operand(dictionary *const name_store, const source *const code, int *
     assert(token_cnt  != nullptr);
     assert(operand    != nullptr);
     assert(*operand   == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_operand: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     const int old_token_cnt = *token_cnt;
 
     if (token_char($cur_token, '('))
@@ -1443,10 +1520,13 @@ bool parse_rvalue_token(dictionary *const name_store, const source *const code, 
     assert(token_cnt  != nullptr);
     assert(subtree    != nullptr);
     assert(*subtree   == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_rvalue_token: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     if ($cur_token.type == INT_NUM)
     {
-        *subtree = new_NUMBER_AST_node($cur_token.int_num_val);
+        *subtree    = new_NUMBER_AST_node($cur_token.int_num_val);
+        *token_cnt += 1;
         return true;
     }
     if (token_undef($cur_token) && !token_char($next_token, '('))
@@ -1464,7 +1544,9 @@ bool parse_lvalue(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt  != nullptr);
     assert(subtree    != nullptr);
     assert(*subtree   == nullptr);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>
+    log_message("start parse_lvalue: old_token_cnt=%d\n", *token_cnt);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<
     if (!token_undef($cur_token)) return true;
 
     int  var_index = -1;
@@ -1531,7 +1613,7 @@ bool token_undef  (const token cur_token) { return cur_token.type == UNDEF_TOKEN
 bool token_char   (const token cur_token, const char cmp) { return cur_token.type == KEY_CHAR && cur_token.key_char_val == cmp; }
 
 //===========================================================================================================================
-// AST_NODE EXTRA FUNCTION
+// AST_NODE MERGE_TREE
 //===========================================================================================================================
 
 //подвешивает subtree к main_tree, используя фиктивные вершины
@@ -1563,7 +1645,7 @@ void assignment_merge_tree(AST_node *const main_tree, AST_node *const subtree)
     assert(main_tree != nullptr);
     assert(subtree   != nullptr);
 
-    assert(main_tree->type == ASSIGNMENT);
+    assert(main_tree->type == OPERATOR && main_tree->value.op_type == ASSIGNMENT);
     
     if (main_tree->right == nullptr)
     {

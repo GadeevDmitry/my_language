@@ -149,6 +149,7 @@ struct source
 struct var_info         // структура с информацией о переменной
 {
     const char *name;   // имя переменной
+    int     name_len;   // длина имени переменной
     stack      scope;   // стек с номерами обласстей видимости, в которых обЪявлена переменная с именем .name
 };
 
@@ -170,6 +171,7 @@ struct arg_list         // структура с аргументами функ
 struct func_info        // структура с информацией о функции
 {
     const char *name;   // имя функции
+    int     name_len;   // длина имени функции
     arg_list    args;   // структура с аргументами данной функции
 };
 
@@ -337,6 +339,13 @@ bool token_or     (const token cur_token);
 bool token_undef  (const token cur_token);
 
 bool token_char   (const token cur_token, const char cmp);
+
+//===========================================================================================================================
+// AST_NODE MERGE_TREE
+//===========================================================================================================================
+
+void fictional_merge_tree (AST_node *const main_tree, AST_node *const subtree);
+void assignment_merge_tree(AST_node *const main_tree, AST_node *const subtree);
 
 //_____________________________________________________LEXICAL_ANALYSIS______________________________________________________
 
