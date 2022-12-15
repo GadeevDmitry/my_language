@@ -1,5 +1,5 @@
 FRONTEND = src/frontend
-NAME_LIST= src/name_list
+AST		 = src/ast
 
 LOG      = lib/logs/log
 STACK    = lib/stack/stack
@@ -10,5 +10,5 @@ CFLAGS = -D _DEBUG -ggdb3 -std=c++20 -O0 -Wall -Wextra -Weffc++ -Waggressive-loo
 
 .PHONY: frontend
 
-frontend: $(FRONTEND).cpp $(LOG).cpp $(STACK).cpp $(NAME_LIST).cpp $(RW).cpp $(ALG).cpp
+frontend: $(FRONTEND).cpp $(LOG).cpp $(STACK).cpp $(RW).cpp $(ALG).cpp $(AST).cpp
 	g++ $^ $(CFLAGS) -o $@
