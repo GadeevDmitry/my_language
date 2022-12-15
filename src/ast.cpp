@@ -60,6 +60,8 @@ static const char *AST_GRAPHVIZ_HEADER = "digraph {\n"
 // STATIC FUNCTION
 //===========================================================================================================================
 
+static void fprintf_tab            (FILE *const stream, const int tab_shift);
+
 static void do_ast_graphviz_dump   (const AST_node *const node, FILE *const stream, int *const node_num);
 static void graphviz_dump_node     (const AST_node *const node, FILE *const stream,  const int node_num);
 static void graphviz_dump_edge     (const int        node_from, const int  node_to,  FILE *const stream);
@@ -146,6 +148,58 @@ void AST_tree_dtor(AST_node *const node)
     AST_tree_dtor(node->left);
     AST_tree_dtor(node->right);
     AST_node_dtor(node);
+}
+
+//===========================================================================================================================
+// PARSE_CONVERT
+//===========================================================================================================================
+
+                                                                // default tab_shift = 0
+void AST_convert(const AST_node *const node, FILE *const stream, const int tab_shift)
+{
+    assert(node   != nullptr);
+    assert(stream != nullptr);
+
+    int node_value = 0;
+    switch ($type)
+    {
+        case FICTIONAL:
+        case OP_IF    :
+        case IF_ELSE  :
+        case OP_WHILE :
+        case OP_RETURN: node_value = 0;
+                        break;
+        case NUMBER   : node_value = $int_num;
+                        break;
+        case VARIABLE :
+        case VAR_DECL : node_value = $var_index;
+                        break;
+        case FUNC_CALL:
+        case FUNC_DECL: node_value = $func_index;
+                        break;
+        case OPERATOR:  node_value = $op_type;
+                        break;
+        default       : break;
+    }
+
+    fprintf_tab(stream, tab_shift);
+    fprintf    (stream, "{ %d %d\n", $type, node_value);
+
+    if (L != nullptr) AST_convert(L, stream, tab_shift + 1);
+    if (R != nullptr) AST_convert(R, stream, tab_shift + 1);
+
+    fprintf_tab(stream, tab_shift);
+    fprintf    (stream, "}\n");
+}
+
+static void fprintf_tab(FILE *const stream, const int tab_shift)
+{
+    assert(stream != nullptr);
+
+    for(int i = 0; i < tab_shift; ++i)
+    {
+        putc('\t', stream);
+    }
 }
 
 //===========================================================================================================================
