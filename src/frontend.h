@@ -195,6 +195,14 @@ struct dictionary       // структура, объединяющая спис
 //____________________________________________________SYNTACTIC_ANALYSIS_____________________________________________________
 
 //===========================================================================================================================
+// CONVERT
+//===========================================================================================================================
+
+void frontend_convert       (dictionary *const name_store, AST_node *const tree, const char *source_file);
+void  var_name_list_convert (                                        const var_name_list *const var_store, FILE *const stream);
+void func_name_list_convert (const func_name_list *const func_store, const var_name_list *const var_store, FILE *const stream);
+
+//===========================================================================================================================
 // VAR_NAME_LIST_CTOR_DTOR
 //===========================================================================================================================
 
@@ -285,7 +293,7 @@ void dictionary_dtor (dictionary *const name_store);
 // TRANSLATOR
 //===========================================================================================================================
 
-AST_node *parse_general(const source *const code);
+AST_node *parse_general(const source *const code, dictionary **const name_store_ptr);
 
 bool parse_var_decl         (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         subtree);
 bool parse_func_decl        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         subtree);
@@ -410,19 +418,21 @@ void skip_source_spaces (source *const code);
 // DUMP
 //===========================================================================================================================
 
-void source_text_dump        (source *const code);
+void var_name_list_text_dump  (var_name_list *const var_store);
+void func_name_list_text_dump (func_name_list *const func_store);
+void source_text_dump         (source *const code);
 
-void lexis_graphviz_dump     (source *const code);
-void do_lexis_graphviz_dump  (source *const code, FILE *const stream);
+void lexis_graphviz_dump      (source *const code);
+void do_lexis_graphviz_dump   (source *const code, FILE *const stream);
 
-void graphviz_dump_edge      (const int token_num_from, const int token_num_to, FILE *const stream);
+void graphviz_dump_edge       (const int token_num_from, const int token_num_to, FILE *const stream);
 
-void graphviz_dump_token     (const token *const cur_token, FILE *const stream, const int token_num);
-void graphviz_describe_token (const token *const cur_token, FILE *const stream, const GRAPHVIZ_COLOR     color,
-                                                                                const GRAPHVIZ_COLOR fillcolor,
-                                                                                const int token_num);
-void get_token_value_message (const token *const cur_token, char *const token_value);
+void graphviz_dump_token      (const token *const cur_token, FILE *const stream, const int token_num);
+void graphviz_describe_token  (const token *const cur_token, FILE *const stream, const GRAPHVIZ_COLOR     color,
+                                                                                 const GRAPHVIZ_COLOR fillcolor,
+                                                                                 const int token_num);
+void get_token_value_message  (const token *const cur_token, char *const token_value);
 
-void system_graphviz_dump    (char *const dump_txt, char *const dump_png);
+void system_graphviz_dump     (char *const dump_txt, char *const dump_png);
 
 #endif //FRONTEND

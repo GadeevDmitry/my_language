@@ -124,18 +124,110 @@ int main(const int argc, const char *argv[])
     }
     source *code = new_source(argv[1]);
     if     (code == nullptr) return 0;
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     source_text_dump(code);
-
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     lexical_analyzer   (code);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("lexis dump:\n");
     lexis_graphviz_dump(code);
-
-    AST_node *root = parse_general(code);
-    log_message("AST dump:\n");
-    AST_tree_graphviz_dump(root);
-
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    dictionary *name_store = nullptr;
+    AST_node   *      root = parse_general(code, &name_store);
+    dictionary_dtor(name_store);
     AST_tree_dtor(root);
-    source_dtor  (code);
+    return 0;
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    log_message("AST dump:\n");
+    AST_tree_graphviz_dump  (root);
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+    if (root == nullptr)
+    {
+        fprintf(stderr, TERMINAL_RED "compile failed\n" TERMINAL_CANCEL);
+        return 0;
+    }
+    else
+    {
+        fprintf(stderr, TERMINAL_GREEN "compile success\n" TERMINAL_CANCEL);
+        frontend_convert(name_store, root, argv[1]);
+    }
+}
+
+//===========================================================================================================================
+// CONVERT
+//===========================================================================================================================
+
+void frontend_convert(dictionary *const name_store, AST_node *const tree, const char *source_file)
+{
+    assert(name_store  != nullptr);
+    assert(tree        != nullptr);
+    assert(source_file != nullptr);
+
+    char    frontend_file[strlen(source_file) + 10] = {};
+    sprintf(frontend_file, "%s.front", source_file);
+
+    FILE *stream = fopen(frontend_file, "w");
+    if   (stream == nullptr)
+    {
+        fprintf(stderr, "can't open \"%s\" to convert the AST\n", frontend_file);
+
+        dictionary_dtor(name_store);
+        AST_tree_dtor  (tree);
+        return;
+    }
+
+    var_name_list_convert (              &$var_store, stream);
+    func_name_list_convert(&$func_store, &$var_store, stream);
+
+    AST_convert(tree, stream);
+
+    dictionary_dtor(name_store);
+    AST_tree_dtor  (tree);
+    fclose         (stream);
+}
+
+void var_name_list_convert(const var_name_list *const var_store, FILE *const stream)
+{
+    assert(var_store != nullptr);
+    assert(stream    != nullptr);
+
+    fprintf(stream, "%d [количество имен]\n", var_store->size);
+
+    for (int i = 0; i < var_store->size; ++i)
+    {
+        fprintf(stream, "%s\n", var_store->var[i].name);
+    }
+    fprintf(stream, "\n");
+}
+
+void func_name_list_convert(const func_name_list *const func_store, const var_name_list *const var_store, FILE *const stream)
+{
+    assert(func_store != nullptr);
+    assert(var_store  != nullptr);
+    assert(stream     != nullptr);
+
+    fprintf(stream, "%d [количество функций]\n", func_store->size);
+
+    for (int i = 0; i < func_store->size; ++i)
+    {
+        const func_info *const    cur_func = func_store->func+i;
+        fprintf(stream, "%s %d ", cur_func->name, cur_func->arg_num);
+
+        for (int j = 0; j < cur_func->arg_num; ++j)
+        {
+            const int   cur_arg_index = cur_func->args.name_index[j];
+            const char *cur_arg_name  = var_store->var[cur_arg_index].name;
+
+            fprintf(stream, "%s ", cur_arg_name);
+        }
+        fprintf(stream, "\n");
+    }
+    fprintf(stream, "\n");
 }
 
 //===========================================================================================================================
@@ -275,7 +367,7 @@ void var_info_push_scope(var_info *const var, const int scope)
     stack_push(&var->scope, &scope);
 }
 
-    void var_info_pop_scope(var_info *const var, const int scope)
+void var_info_pop_scope(var_info *const var, const int scope)
 {
     assert(var != nullptr);
 
@@ -528,13 +620,17 @@ void dictionary_dtor(dictionary *const name_store)
         dictionary_dtor(&name_store);                                                                                       \
         return nullptr;
 
-AST_node *parse_general(const source *const code)
+AST_node *parse_general(const source *const code, dictionary **const name_store_ptr)
 {
-    assert(code != nullptr);
+    assert(code           != nullptr);
+    assert(name_store_ptr != nullptr);
 
     dictionary name_store = {};
     dictionary_ctor(&name_store);
-
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&name_store.var_store);
+    func_name_list_text_dump(&name_store.func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     AST_node   *root = new_FICTIONAL_AST_node(0);
     int    token_cnt = 0;
     while (token_cnt < lexis_pos)
@@ -550,7 +646,7 @@ AST_node *parse_general(const source *const code)
         fprintf_err(lexis_data[token_cnt].token_line, "undefined function or variable declaration\n");
         general_err_exit;
     }
-    dictionary_dtor(&name_store);
+    *name_store_ptr = &name_store;
     return root;
 }
 #undef general_err_exit
@@ -1213,6 +1309,10 @@ bool parse_rvalue(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt    != nullptr);
     assert(rvalue_tree  != nullptr);
     assert(*rvalue_tree == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_rvalue: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1245,6 +1345,10 @@ bool parse_assignment(dictionary *const name_store, const source *const code, in
     assert(token_cnt    != nullptr);
     assert(assign_tree  != nullptr);
     assert(*assign_tree == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_assignment: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1292,6 +1396,10 @@ bool parse_op_or(dictionary *const name_store, const source *const code, int *co
     assert(token_cnt  != nullptr);
     assert(or_tree    != nullptr);
     assert(*or_tree   == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_op_or: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1324,6 +1432,10 @@ bool parse_op_and(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt  != nullptr);
     assert(and_tree   != nullptr);
     assert(*and_tree  == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_op_and: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1357,6 +1469,10 @@ bool parse_op_equal(dictionary *const name_store, const source *const code, int 
     assert(token_cnt   != nullptr);
     assert(equal_tree  != nullptr);
     assert(*equal_tree == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_op_equal: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1391,6 +1507,10 @@ bool parse_op_compare(dictionary *const name_store, const source *const code, in
     assert(token_cnt  != nullptr);
     assert(cmp_tree   != nullptr);
     assert(*cmp_tree  == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_op_compare: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1425,6 +1545,10 @@ bool parse_op_add_sub(dictionary *const name_store, const source *const code, in
     assert(token_cnt     != nullptr);
     assert(add_sub_tree  != nullptr);
     assert(*add_sub_tree == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_value_op_add_sub: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1459,6 +1583,10 @@ bool parse_op_mul_div(dictionary *const name_store, const source *const code, in
     assert(token_cnt     != nullptr);
     assert(mul_div_tree  != nullptr);
     assert(*mul_div_tree == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_op_mul_div: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1493,6 +1621,10 @@ bool parse_op_pow(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt  != nullptr);
     assert(pow_tree   != nullptr);
     assert(*pow_tree  == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_op_pow: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1526,6 +1658,10 @@ bool parse_op_not(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt  != nullptr);
     assert(not_tree   != nullptr);
     assert(*not_tree  == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_op_not: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1563,6 +1699,10 @@ bool parse_operand(dictionary *const name_store, const source *const code, int *
     assert(token_cnt  != nullptr);
     assert(operand    != nullptr);
     assert(*operand   == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_operand: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1597,6 +1737,10 @@ bool parse_rvalue_token(dictionary *const name_store, const source *const code, 
     assert(token_cnt  != nullptr);
     assert(subtree    != nullptr);
     assert(*subtree   == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_rvalue_token: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1621,6 +1765,10 @@ bool parse_lvalue(dictionary *const name_store, const source *const code, int *c
     assert(token_cnt  != nullptr);
     assert(subtree    != nullptr);
     assert(*subtree   == nullptr);
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    var_name_list_text_dump (&$var_store);
+    func_name_list_text_dump(&$func_store);
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_lvalue: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -2002,6 +2150,99 @@ void skip_source_spaces(source *const code)
 //===========================================================================================================================
 // DUMP
 //===========================================================================================================================
+
+void var_name_list_text_dump(var_name_list *const var_store)
+{
+    if (var_store == nullptr)
+    {
+        log_warning("var_store to dump is nullptr\n");
+        return;
+    }
+
+    log_message("\n"
+                "var_store\n"
+                "{\n"
+                "    size     = %d\n"
+                "    capacity = %d\n"
+                "    var      = %p\n"
+                "    {\n",
+                var_store->size,
+                var_store->capacity,
+                var_store->var);
+
+    for (int i = 0; i < var_store->size; ++i)
+    {
+        const var_info *const cur_var = var_store->var+i;
+
+        log_message("        %d\n"
+                    "        {\n"
+                    "            name     = \"%s\"\n"
+                    "            name_len = %d\n"
+                    "        }\n",
+                    i,
+                    cur_var->name,
+                    cur_var->name_len);
+    }
+    log_message("    }\n"
+                "}\n");
+}
+
+void func_name_list_text_dump(func_name_list *const func_store)
+{
+    if (func_store == nullptr)
+    {
+        log_warning("func_store to dump is nullptr\n");
+        return;
+    }
+
+    log_message("\n"
+                "func_store\n"
+                "{\n"
+                "    size     = %d\n"
+                "    capacity = %d\n"
+                "    func     = %p\n"
+                "    {\n",
+                func_store->size,
+                func_store->capacity,
+                func_store->func);
+
+    for (int i = 0; i < func_store->size; ++i)
+    {
+        const func_info *const cur_func = func_store->func+i;
+
+        log_message("        %d\n"
+                    "        {\n"
+                    "            name     = \"%s\"\n"
+                    "            name_len = %d\n"
+                    "            arg_num  = %d\n"
+                    "            args     = %p\n"
+                    "            {\n",
+                    i,
+                    cur_func->name,
+                    cur_func->name_len,
+                    cur_func->arg_num,
+                    cur_func->args);
+        
+        const arg_list *const cur_args = &cur_func->args;
+
+        log_message("                size       = %d\n"
+                    "                capacity   = %d\n"
+                    "                name_index = %p\n"
+                    "                {\n"
+                    "                    ",
+                    cur_args->size,
+                    cur_args->capacity,
+                    cur_args->name_index);
+
+        for (int j = 0; j < cur_args->size; ++j) log_message("%d ", cur_args->name_index[j]);
+        log_message("\n"
+                    "                }\n"
+                    "            }\n"
+                    "        }\n");
+    }
+    log_message("    }\n"
+                "}\n");
+}
 
 void source_text_dump(source *const code)
 {
