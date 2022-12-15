@@ -172,6 +172,7 @@ struct func_info        // структура с информацией о фу�
 {
     const char *name;   // имя функции
     int     name_len;   // длина имени функции
+    int      arg_num;   // количество аргументов функции
     arg_list    args;   // структура с аргументами данной функции
 };
 
@@ -251,17 +252,27 @@ void arg_list_dtor (arg_list *const arg_store);
 
 // Добавляет функцию cur_token в список имен func_store
 // Возвращает индекс имени в списке имен
-int func_name_list_add_func     (func_name_list *const func_store, const source *const code, const token *const cur_token);
+int func_name_list_add_func          (func_name_list *const func_store, const source *const code, const token *const cur_token);
 
 //Возвращает индекс функции cur_token в списке имен func_store, если она объявлена, и -1 иначе
-int func_name_list_defined_func (func_name_list *const func_store, const source *const code, const token *const cur_token);
+int func_name_list_defined_func      (func_name_list *const func_store, const source *const code, const token *const cur_token);
+
+//Добавляет аргументы функции с номером func_index в списке имен func_store
+//Аргументы берутся из дерева аргументов node
+void func_name_list_add_args         (func_name_list *const func_store, const int func_index, AST_node *const node);
+
+//Возвращает количество аргументов функции с номером func_index в списке имен func_store
+int func_name_list_get_arg_num (const func_name_list *const func_store, const int func_index);
 
 //===========================================================================================================================
 // FUNC_NAME_LIST CLOSED
 //===========================================================================================================================
 
-bool same_func              (const source *const code, func_info *const func, const token *const cur_token);
+bool same_func              (const source   *const       code, func_info *const func, const token *const cur_token);
 void func_name_list_realloc (func_name_list *const func_store);
+void func_name_add_args     (func_info      *const       func, const AST_node *const node);
+void arg_list_push_arg      (arg_list       *const  arg_store, const int        arg_index);
+void arg_list_realloc       (arg_list       *const  arg_store);
 
 //===========================================================================================================================
 // DICTIONARY_CTOR_DTOR
@@ -341,12 +352,17 @@ bool token_undef  (const token cur_token);
 bool token_char   (const token cur_token, const char cmp);
 
 //===========================================================================================================================
-// AST_NODE MERGE_TREE
+// AST_NODE DESCENT
 //===========================================================================================================================
 
+//подвешивает subtree к main_tree, используя фиктивные вершины
 void fictional_merge_tree (AST_node *const main_tree, AST_node *const subtree);
+
+//подвешивает rvalue subtree к дереву присвоений main_tree
 void assignment_merge_tree(AST_node *const main_tree, AST_node *const subtree);
 
+//считает количество нефиктивных поддеревьев в дереве node
+int get_subtree_num (const AST_node *const node);
 //_____________________________________________________LEXICAL_ANALYSIS______________________________________________________
 
 //===========================================================================================================================

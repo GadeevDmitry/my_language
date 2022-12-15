@@ -344,6 +344,7 @@ void func_info_ctor(func_info *const func, const source *const code, const token
 
     func->name     = strndup(name_beg, (size_t) name_len);
     func->name_len = name_len;
+    func->arg_num  = 0;
     arg_list_ctor(&func->args);
 }
 
@@ -355,6 +356,7 @@ void func_info_dtor(func_info *const func)
     arg_list_dtor(&func->args);
 
     func->name_len = 0;
+    func->arg_num  = 0;
 }
 
 void arg_list_ctor(arg_list *const arg_store)
@@ -406,6 +408,26 @@ int func_name_list_defined_func(func_name_list *const func_store, const source *
     return -1;
 }
 
+void func_name_list_add_args(func_name_list *const func_store, const int func_index, AST_node *const node)
+{
+    assert(func_store != nullptr);
+
+    assert(func_index >= 0);
+    assert(func_index < func_store->size);
+
+    func_name_add_args(func_store->func+func_index, node);
+}
+
+int func_name_list_get_arg_num(const func_name_list *const func_store, const int func_index)
+{
+    assert(func_store != nullptr);
+
+    assert(func_index >= 0);
+    assert(func_index < func_store->size);
+
+    return func_store->func[func_index].arg_num;
+}
+
 //===========================================================================================================================
 // FUNC_NAME_LIST CLOSED
 //===========================================================================================================================
@@ -434,6 +456,42 @@ void func_name_list_realloc(func_name_list *const func_store)
         func_store->func      = (func_info *) log_realloc(func_store->func, (size_t) func_store->capacity * sizeof(func_info));
     }
 }
+
+void func_name_add_args(func_info *const func, const AST_node *const node)
+{
+    assert(func != nullptr);
+
+    if (node == nullptr) return;
+
+    if ($type == FICTIONAL) { func_name_add_args(func, L); func_name_add_args(func, R); return; }
+    if ($type ==  VARIABLE)
+    {
+        arg_list_push_arg(&func->args, $var_index);
+        func->arg_num++;
+        return;
+    }
+    assert(false && "bad AST-node function argument type");
+}
+
+void arg_list_push_arg(arg_list *const arg_store, const int arg_index)
+{
+    assert(arg_store != nullptr);
+
+    arg_list_realloc(arg_store);
+    arg_store->name_index[arg_store->size++] = arg_index;
+}
+
+void arg_list_realloc(arg_list *const arg_store)
+{
+    assert(arg_store != nullptr);
+
+    if (arg_store->size == arg_store->capacity)
+    {
+        arg_store->capacity  *= 2;
+        arg_store->name_index = (int *) log_realloc(arg_store->name_index, (size_t) arg_store->capacity * sizeof(int));
+    }
+}
+
 //===========================================================================================================================
 // DICTIONARY_CTOR_DTOR
 //===========================================================================================================================
@@ -550,13 +608,15 @@ bool parse_func_decl(dictionary *const name_store, const source *const code, int
         fprintf_err($cur_token.token_line, "redefined function\n");
         func_decl_err_exit
     }
-    *func_decl_tree = new_FUNC_DECL_AST_node(func_name_list_add_func(&$func_store, code, &$cur_token));
-    *token_cnt     += 2;
+    const int func_index = func_name_list_add_func(&$func_store, code, &$cur_token);
+    *func_decl_tree      = new_FUNC_DECL_AST_node (func_index);
+    *token_cnt          += 2;
 
     AST_node *subtree = nullptr;
 
     if (!parse_func_args(name_store, code, token_cnt, &subtree)) { func_decl_err_exit }
 
+    func_name_list_add_args(&$func_store, func_index, subtree);
     (*func_decl_tree)->left = subtree;
     if (subtree != nullptr) subtree->prev = *func_decl_tree;
     subtree = nullptr;
@@ -659,8 +719,8 @@ bool parse_operators(dictionary *const name_store, const source *const code, int
         AST_node *subtree = nullptr;
 
         #define call_parser(parser_name)                                                                                    \
-            if (! parser_name (name_store, code, token_cnt, &subtree)) { operators_err_exit }                               \
-            if (subtree != nullptr)                                    { fictional_merge_tree(*op_tree, subtree); continue; }
+            if (!parser_name(name_store, code, token_cnt, &subtree)) { operators_err_exit }                                 \
+            if (subtree != nullptr)                                  { fictional_merge_tree(*op_tree, subtree); continue; }
 
         call_parser(parse_var_decl)
         call_parser(parse_op_assignment)
@@ -1022,8 +1082,8 @@ bool parse_func_call(dictionary *const name_store, const source *const code, int
 
     if (!(token_undef($cur_token) && token_char($next_token, '('))) return true;
 
-    int  func_index = -1;
-    if ((func_index = func_name_list_defined_func(&$func_store, code, &$cur_token)) == -1)
+    const int func_index = func_name_list_defined_func(&$func_store, code, &$cur_token);
+    if (      func_index == -1)
     {
         fprintf_err($cur_token.token_line, "undefined function\n");
         func_call_err_exit
@@ -1031,17 +1091,33 @@ bool parse_func_call(dictionary *const name_store, const source *const code, int
     *subtree    = new_FUNC_CALL_AST_node(func_index);
     *token_cnt += 2;
     
-    if (token_char($cur_token, ')')) { *token_cnt += 1; return true; }
+    int param_num = 0;
+    if (token_char($cur_token, ')'))
+    {
+        if (param_num != func_name_list_get_arg_num(&$func_store, func_index))
+        {
+            fprintf_err($cur_token.token_line, "bad number of parameters in function call\n");
+            func_call_err_exit
+        }
+        *token_cnt += 1;
+        return true;
+    }
 
     AST_node *param_tree = nullptr;
     if (!parse_func_call_param(name_store, code, token_cnt, &param_tree)) { func_call_err_exit }
 
+    param_num = get_subtree_num(param_tree);
     (*subtree)->left = param_tree;
     param_tree->prev = *subtree;
 
     if (!token_char($cur_token, ')'))
     {
         fprintf_err($cur_token.token_line, "expected ')' after function parameters\n");
+        func_call_err_exit
+    }
+    if (param_num != func_name_list_get_arg_num(&$func_store, func_index))
+    {
+        fprintf_err($cur_token.token_line, "bad number of parameters in function call\n");
         func_call_err_exit
     }
     *token_cnt += 1;
@@ -1614,10 +1690,9 @@ bool token_undef  (const token cur_token) { return cur_token.type == UNDEF_TOKEN
 bool token_char   (const token cur_token, const char cmp) { return cur_token.type == KEY_CHAR && cur_token.key_char_val == cmp; }
 
 //===========================================================================================================================
-// AST_NODE MERGE_TREE
+// AST_NODE DESCENT
 //===========================================================================================================================
 
-//подвешивает subtree к main_tree, используя фиктивные вершины
 void fictional_merge_tree(AST_node *const main_tree, AST_node *const subtree)
 {
     assert(main_tree != nullptr);
@@ -1655,6 +1730,14 @@ void assignment_merge_tree(AST_node *const main_tree, AST_node *const subtree)
         return;
     }
     assignment_merge_tree(main_tree->right, subtree);
+}
+
+int get_subtree_num(const AST_node *const node)
+{
+    if (node == nullptr) return 0;
+
+    if ($type == FICTIONAL) return get_subtree_num(L) + get_subtree_num(R);
+    return 1;
 }
 
 //===========================================================================================================================
