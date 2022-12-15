@@ -83,6 +83,9 @@ static void LOG_STREAM_CLOSE ();
 
 /*___________________________________________________________________________________________*/
 
+//void *CALLOCED[1000] = {}; int CALLOCED_CNT = 0;
+//void *FREED   [1000] = {}; int FREED_CNT    = 0;
+
 static FILE *LOG_STREAM            = nullptr;
 static int  _OPEN_CLOSE_LOG_STREAM = LOG_STREAM_OPEN();
 static int   DYNAMIC_MEMORY        = 0;
@@ -111,6 +114,11 @@ static void LOG_STREAM_CLOSE()
 
     fprintf(LOG_STREAM, "\n");
     
+    //log_message("\ncalloced:\n");
+    //for (int i = 0; i < CALLOCED_CNT; ++i) log_message("%p\n", CALLOCED[i]);
+    //log_message("\nfreed:\n");
+    //for (int i = 0; i < FREED_CNT; ++i) log_message("%p\n", FREED[i]);
+
     if (DYNAMIC_MEMORY == 0) log_message(GREEN "DYNAMIC_MEMORY = 0. \n" CANCEL                );
     else                     log_message(RED   "DYNAMIC_MEMORY = %d.\n" CANCEL, DYNAMIC_MEMORY);
     
@@ -202,6 +210,7 @@ void *log_calloc(size_t number, size_t size)
     void *ret = calloc(number, size);
     if   (ret == nullptr) return nullptr;
 
+    //CALLOCED[CALLOCED_CNT++] = ret;
     ++DYNAMIC_MEMORY;
     return ret;
 }
@@ -211,8 +220,8 @@ void *log_realloc(void *ptr, size_t size)
     void *ret = realloc(ptr, size);
 
     if (ptr == nullptr && size == 0) return ret;
-    if (ptr == nullptr) { ++DYNAMIC_MEMORY; return ret; }
-    else if (size == 0) { --DYNAMIC_MEMORY; return ret; }
+    if (ptr == nullptr) { /*CALLOCED[CALLOCED_CNT++] = ret;*/ ++DYNAMIC_MEMORY; return ret; }
+    else if (size == 0) { /*FREED   [FREED_CNT++]    = ret;*/ --DYNAMIC_MEMORY; return ret; }
     else
     {
         return ret;
@@ -222,6 +231,7 @@ void log_free(void *ptr)
 {
     if (ptr == nullptr) return;
 
+    //FREED[FREED_CNT++] = ptr;
     --DYNAMIC_MEMORY;
     free(ptr);
 }
