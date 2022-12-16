@@ -28,42 +28,20 @@ static const char *AST_NODE_TYPE_NAMES[] =
     "OP_WHILE"  ,
     "OPERATOR"  ,
     "VAR_DECL"  ,
-    "FUNC_CALL" ,
     "FUNC_DECL" ,
+    "FUNC_CALL" ,
     "OP_RETURN" ,
-};
-static const char *OPERATOR_NAMES[] =
-{
-    "nothing"       ,
-    "add"           ,
-    "sub"           ,
-    "mul"           ,
-    "div"           ,
-    "pow"           ,
-    "input"         ,
-    "output"        ,
-    "equal"         ,
-    "above"         ,
-    "below"         ,
-    "above_equal"   ,
-    "below_equal"   ,
-    "not_equal"     ,
-    "not"           ,
-    "or"            ,
-    "and"           ,
-    "assignment"    ,
 };
 static const char *AST_GRAPHVIZ_HEADER = "digraph {\n"
                                          "splines=ortho\n"
-                                         "node[shape=record, style=\"rounded, filled\", fontsize=8]\n";
+                                         "node[style=\"rounded, filled\", fontsize=8]\n";
 
 //===========================================================================================================================
 // STATIC FUNCTION
 //===========================================================================================================================
 
-static void fprintf_tab            (FILE *const stream, const int tab_shift);
-
 static bool AST_parse_dfs          (const char *buff, const int buff_size, int *const buff_pos, AST_node **const    node);
+static bool get_buff_char          (const char *buff, const int buff_size, int *const buff_pos, const char c);
 
 static void do_ast_graphviz_dump   (const AST_node *const node, FILE *const stream, int *const node_num);
 static void graphviz_dump_node     (const AST_node *const node, FILE *const stream,  const int node_num);
@@ -195,7 +173,7 @@ void AST_convert(const AST_node *const node, FILE *const stream, const int tab_s
     fprintf    (stream, "}\n");
 }
 
-static void fprintf_tab(FILE *const stream, const int tab_shift)
+void fprintf_tab(FILE *const stream, const int tab_shift)
 {
     assert(stream != nullptr);
 
@@ -222,14 +200,6 @@ AST_node *AST_parse(const char *buff, const int buff_size, int *const buff_pos)
         *node = nullptr;                                                                                                    \
         return false;
 
-#define check_overflow                                                                                                      \
-        skip_ast_spaces(buff, buff_size, buff_pos);                                                                         \
-        if (*buff_pos >= buff_size)                                                                                         \
-        {                                                                                                                   \
-            fprintf_err("expected '}'\n");                                                                                  \
-            AST_parse_dfs_err_exit                                                                                          \
-        }
-
 static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff_pos, AST_node **const node)
 {
     assert(buff     != nullptr);
@@ -240,18 +210,19 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
     if (!get_buff_char(buff, buff_size, buff_pos, '{'))
     {
         fprintf_err("expected '{'\n");
+        fprintf(stderr, "buff_pos = %d\n", *buff_pos);
         AST_parse_dfs_err_exit
     }
 
     int node_type = 0;
     int node_val  = 0;
 
-    if (!get_int_buff(buff, buff_size, buff_pos, &node_type))
+    if (!get_buff_int(buff, buff_size, buff_pos, &node_type))
     {
         fprintf_err("expected node type\n");
         AST_parse_dfs_err_exit
     }
-    if (!get_int_buff(buff, buff_size, buff_pos, &node_val))
+    if (!get_buff_int(buff, buff_size, buff_pos, &node_val))
     {
         fprintf_err("expected node value\n");
         AST_parse_dfs_err_exit
@@ -260,29 +231,26 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
     switch (node_type)
     {
         case FICTIONAL: *node = new_FICTIONAL_AST_node(node_val); break;
+        case NUMBER   : *node = new_NUMBER_AST_node   (node_val); break;
+        case VARIABLE : *node = new_VARIABLE_AST_node (node_val); break;
         case OP_IF    : *node = new_OP_IF_AST_node    (node_val); break;
         case IF_ELSE  : *node = new_IF_ELSE_AST_node  (node_val); break;
         case OP_WHILE : *node = new_OP_WHILE_AST_node (node_val); break;
-        case OP_RETURN: *node = new_OP_RETURN_AST_node(node_val); break;
-        case NUMBER   : *node = new_NUMBER_AST_node   (node_val); break;
-        case VARIABLE : *node = new_VARIABLE_AST_node (node_val); break;
-        case VAR_DECL : *node = new_VAR_DECL_AST_node (node_val); break;
-        case FUNC_CALL: *node = new_FUNC_CALL_AST_node(node_val); break;
-        case FUNC_DECL: *node = new_FUNC_CALL_AST_node(node_val); break;
         case OPERATOR : *node = new_OPERATOR_AST_node ((OPERATOR_TYPE) node_val); break;
+        case VAR_DECL : *node = new_VAR_DECL_AST_node (node_val); break;
+        case FUNC_DECL: *node = new_FUNC_DECL_AST_node(node_val); break;
+        case FUNC_CALL: *node = new_FUNC_CALL_AST_node(node_val); break;
+        case OP_RETURN: *node = new_OP_RETURN_AST_node(node_val); break;
         default       : fprintf_err("invalid node type\n");
                         AST_parse_dfs_err_exit
     }
-    check_overflow
     if (get_buff_char(buff, buff_size, buff_pos, '}')) return true;
 
     AST_node *left  = nullptr;
     AST_node *right = nullptr;
 
     if (!AST_parse_dfs(buff, buff_size, buff_pos, &left)) { AST_parse_dfs_err_exit }
-
-    check_overflow
-    if (get_buff_char(buff, buff_size, buff_pos, '}'))
+    if ( get_buff_char(buff, buff_size, buff_pos, '}'))
     {
         if ((*node)->type == FUNC_DECL) //в этом случае у функции нет аргументов
         {
@@ -296,11 +264,14 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
         }
         return true;
     }
-    if (!AST_parse_dfs(buff, buff_size, buff_pos, &right)) { AST_parse_dfs_err_exit }
-
-    skip_ast_spaces(buff, buff_size, buff_pos);
-    if (*buff_pos >= buff_size || buff[*buff_pos] != '}')
+    if (!AST_parse_dfs(buff, buff_size, buff_pos, &right))
     {
+        AST_tree_dtor(left);
+        AST_parse_dfs_err_exit
+    }
+    if (!get_buff_char(buff, buff_size, buff_pos, '}'))
+    {
+        AST_tree_dtor(left);
         fprintf_err("expected '}'\n");
         AST_parse_dfs_err_exit
     }
@@ -312,7 +283,6 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
 
     return true;
 }
-#undef check_overflow
 #undef AST_parse_dfs_err_exit
 #undef fprintf_err
 
@@ -334,7 +304,7 @@ bool get_buff_int(const char *buff, const int buff_size, int *const buff_pos, in
     return true;
 }
 
-bool get_buff_char(const char *buff, const int buff_size, int *const buff_pos, const char c)
+static bool get_buff_char(const char *buff, const int buff_size, int *const buff_pos, const char c)
 {
     assert(buff     != nullptr);
     assert(buff_pos != nullptr);
@@ -361,12 +331,16 @@ bool get_ast_word(const char *buff, const int buff_size, int *const buff_pos, co
     const char *name_beg = buff + *buff_pos;
     int         name_len = 0;
 
-    while (*buff_pos < buff_size && !isspace(buff[*buff_pos]) && buff[*buff_pos] != '[') *buff_pos += 1;
+    while (*buff_pos < buff_size && buff[*buff_pos] != '\0'
+                                 && buff[*buff_pos] != '['
+                                 && !isspace(buff[*buff_pos])) *buff_pos += 1;
 
-    name_len = (buff + *buff_pos) - name_beg + 1;
+    name_len = (buff + *buff_pos) - name_beg;
 
     if (_name_beg != nullptr) *_name_beg = name_beg;
     if (_name_len != nullptr) *_name_len = name_len;
+
+    return true;
 }
 
 void skip_ast_spaces(const char *buff, const int buff_size, int *const buff_pos)
@@ -376,12 +350,15 @@ void skip_ast_spaces(const char *buff, const int buff_size, int *const buff_pos)
 
     skip_spaces(buff, buff_size, buff_pos);
 
-    if (buff_size == *buff_pos) return;
-    if (buff[*buff_pos] == '[') //начало комментария
+    if    (buff_size == *buff_pos) return;
+    while (buff[*buff_pos] == '[') //начало комментария
     {
         *buff_pos += 1;
+
         while (*buff_pos < buff_size &&       *buff_pos  != ']') *buff_pos += 1;
         if    (*buff_pos < buff_size &&  buff[*buff_pos] == ']') *buff_pos += 1;
+
+        skip_spaces(buff, buff_size, buff_pos);
     }
 }
 
@@ -495,16 +472,12 @@ static void graphviz_describe_node(const AST_node *const node, FILE *const strea
     char node_value[GRAPHVIZ_SIZE_CMD] = {};
     get_node_value_message(node, node_value);
 
-    fprintf(stream, "node%d[color=\"%s\", fillcolor=\"%s\", label=\"{cur: %p\\n | prev: %p\\n | type: %s\\n | %s | {left: %p | right: %p}}\"]\n",
+    fprintf(stream, "node%d[color=\"%s\", fillcolor=\"%s\", label=\"{type: %s | %s }\"]\n",
                          node_num,
                                     GRAPHVIZ_COLOR_NAMES[color],
                                                       GRAPHVIZ_COLOR_NAMES[fillcolor],
-                                                                          node,
-                                                                                        P,
-                                                                                                      AST_NODE_TYPE_NAMES[$type],
-                                                                                                              node_value,
-                                                                                                                          L,
-                                                                                                                                      R);
+                                                                           AST_NODE_TYPE_NAMES[$type],
+                                                                                node_value);
 }
 
 static void get_node_value_message(const AST_node *const node, char *const node_value)

@@ -61,6 +61,28 @@ enum OPERATOR_TYPE
     ASSIGNMENT      ,
 };
 
+static const char *OPERATOR_NAMES[] =
+{
+    "nothing"       ,
+    "add"           ,
+    "sub"           ,
+    "mul"           ,
+    "div"           ,
+    "pow"           ,
+    "input"         ,
+    "output"        ,
+    "equal"         ,
+    "above"         ,
+    "below"         ,
+    "above_equal"   ,
+    "below_equal"   ,
+    "not_equal"     ,
+    "not"           ,
+    "or"            ,
+    "and"           ,
+    "assignment"    ,
+};
+
 //===========================================================================================================================
 // STRUCT
 //===========================================================================================================================
@@ -136,10 +158,11 @@ void AST_tree_dtor (AST_node *const node);
 AST_node *AST_parse   (const char *buff, const int buff_size, int *const buff_pos);
 void      AST_convert (const AST_node *const node, FILE *const stream, const int tab_shift = 0);
 
-bool get_int_buff     (const char *buff, const int buff_size, int *const buff_pos, int *const    int_num);
+bool get_buff_int     (const char *buff, const int buff_size, int *const buff_pos, int *const    int_num);
 bool get_ast_word     (const char *buff, const int buff_size, int *const buff_pos, const char **name_beg = nullptr,
                                                                                    int *const   name_len = nullptr);
 void skip_ast_spaces  (const char *buff, const int buff_size, int *const buff_pos);
+void fprintf_tab      (FILE *const stream, const int tab_shift);
 
 //===========================================================================================================================
 // DUMP
