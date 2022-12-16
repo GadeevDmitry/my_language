@@ -185,7 +185,7 @@ void var_name_list_convert(const var_name_list *const var_store, FILE *const str
     assert(var_store != nullptr);
     assert(stream    != nullptr);
 
-    fprintf(stream, "%d [количество имен]\n", var_store->size);
+    fprintf(stream, "%d\n", var_store->size);
 
     for (int i = 0; i < var_store->size; ++i)
     {
@@ -200,21 +200,11 @@ void func_name_list_convert(const func_name_list *const func_store, const var_na
     assert(var_store  != nullptr);
     assert(stream     != nullptr);
 
-    fprintf(stream, "%d [количество функций]\n", func_store->size);
+    fprintf(stream, "%d\n", func_store->size);
 
     for (int i = 0; i < func_store->size; ++i)
     {
-        const func_info *const    cur_func = func_store->func+i;
-        fprintf(stream, "%s %d ", cur_func->name, cur_func->arg_num);
-
-        for (int j = 0; j < cur_func->arg_num; ++j)
-        {
-            const int   cur_arg_index = cur_func->args.name_index[j];
-            const char *cur_arg_name  = var_store->var[cur_arg_index].name;
-
-            fprintf(stream, "%s ", cur_arg_name);
-        }
-        fprintf(stream, "\n");
+        fprintf(stream, "%s\n", func_store->func[i].name);
     }
     fprintf(stream, "\n");
 }
