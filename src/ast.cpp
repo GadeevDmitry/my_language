@@ -209,8 +209,7 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
 
     if (!get_buff_char(buff, buff_size, buff_pos, '{'))
     {
-        fprintf_err("expected '{'\n");
-        fprintf(stderr, "buff_pos = %d\n", *buff_pos);
+        fprintf_err("AST parser: expected '{'\n");
         AST_parse_dfs_err_exit
     }
 
@@ -219,12 +218,12 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
 
     if (!get_buff_int(buff, buff_size, buff_pos, &node_type))
     {
-        fprintf_err("expected node type\n");
+        fprintf_err("AST parser: expected node type\n");
         AST_parse_dfs_err_exit
     }
     if (!get_buff_int(buff, buff_size, buff_pos, &node_val))
     {
-        fprintf_err("expected node value\n");
+        fprintf_err("AST parser: expected node value\n");
         AST_parse_dfs_err_exit
     }
 
@@ -241,7 +240,7 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
         case FUNC_DECL: *node = new_FUNC_DECL_AST_node(node_val); break;
         case FUNC_CALL: *node = new_FUNC_CALL_AST_node(node_val); break;
         case OP_RETURN: *node = new_OP_RETURN_AST_node(node_val); break;
-        default       : fprintf_err("invalid node type\n");
+        default       : fprintf_err("AST parser: invalid node type\n");
                         AST_parse_dfs_err_exit
     }
     if (get_buff_char(buff, buff_size, buff_pos, '}')) return true;
@@ -272,7 +271,7 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
     if (!get_buff_char(buff, buff_size, buff_pos, '}'))
     {
         AST_tree_dtor(left);
-        fprintf_err("expected '}'\n");
+        fprintf_err("AST parser: expected '}'\n");
         AST_parse_dfs_err_exit
     }
     (*node)->left  =  left;

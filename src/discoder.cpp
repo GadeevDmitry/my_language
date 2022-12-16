@@ -27,14 +27,6 @@ int main(const int argc, const char *argv[])
     int         buff_pos  = 0;
     int         buff_size = 0;
     const char *buff      = (const char *) read_file(argv[1], &buff_size);
-    //>>>>>>>>>>>>>>>>>>>>>>>
-    log_message("buff_size = %d\n", buff_size);
-    for (int i = 0; i < buff_size; ++i)
-    {
-        log_message("\"%c\"", buff[i]);
-        log_message(" %d\n", i);
-    }
-    //<<<<<<<<<<<<<<<<<<<<<<<
     if         (buff      == nullptr)
     {
         fprintf(stderr, "can't open \"%s\"\n", argv[1]);
@@ -47,14 +39,13 @@ int main(const int argc, const char *argv[])
 
     if (!discoder_parse(&var_store, &func_store, &tree, buff, buff_size, &buff_pos))
     {
-        log_error("discoder parse failed\n");
         log_free ((char *)buff);
         return 0;
     }
     log_free((char *)buff);
-    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    AST_tree_graphviz_dump(tree);
-    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+    //AST_tree_graphviz_dump(tree);
+
     FILE *source_stream = fopen(argv[2], "w");
     if   (source_stream == nullptr)
     {
@@ -97,14 +88,14 @@ bool discoder_translate(const AST_node *const node, FILE *const stream, const na
         case NUMBER   : return translate_number   (node, stream, var_store, func_store, tab_shift, independent_op);
         case VARIABLE : return translate_variable (node, stream, var_store, func_store, tab_shift, independent_op);
         case OP_IF    : return translate_if       (node, stream, var_store, func_store, tab_shift, independent_op);
-        case IF_ELSE  : fprintf_err("\"IF-ELSE\" node type with not \"IF\" node parent\n"); return false;
+        case IF_ELSE  : fprintf_err("discoder translate: \"IF-ELSE\" node type with not \"IF\" node parent\n"); return false;
         case OP_WHILE : return translate_while    (node, stream, var_store, func_store, tab_shift, independent_op);
         case OPERATOR : return translate_operator (node, stream, var_store, func_store, tab_shift, independent_op);
         case VAR_DECL : return translate_var_decl (node, stream, var_store, func_store, tab_shift, independent_op);
         case FUNC_DECL: return translate_func_decl(node, stream, var_store, func_store, tab_shift, independent_op);
         case FUNC_CALL: return translate_func_call(node, stream, var_store, func_store, tab_shift, independent_op);
         case OP_RETURN: return translate_return   (node, stream, var_store, func_store, tab_shift, independent_op);
-        default       : fprintf_err("undefined node type\n"); return false;
+        default       : fprintf_err("discoder translate: undefined node type\n"); return false;
     }
     return false;
 }
@@ -137,7 +128,7 @@ bool translate_number(const AST_node *const node, FILE *const stream, const name
 
     if (independent_op)
     {
-        fprintf_err("\"NUMBER\" node is independent operator\n");
+        fprintf_err("discoder translate: \"NUMBER\" node is independent operator\n");
         return false;
     }
     fprintf(stream, "%d", $int_num);
@@ -160,12 +151,12 @@ bool translate_variable(const AST_node *const node, FILE *const stream, const na
 
     if (independent_op)
     {
-        fprintf_err("\"VARIABLE\" node is independent operator\n");
+        fprintf_err("discoder translate: \"VARIABLE\" node is independent operator\n");
         return false;
     }
     if (var_store->size <= $var_index)
     {
-        fprintf_err("index of variable is more than size of variable store\n");
+        fprintf_err("discoder translate: index of variable is more than size of variable store\n");
         return false;
     }
     fprintf(stream, "%s", var_store->word[$var_index].name);
@@ -188,7 +179,7 @@ bool translate_if(const AST_node *const node, FILE *const stream, const name_lis
 
     if (!independent_op)
     {
-        fprintf_err("\"IF\" node is not independent operator\n");
+        fprintf_err("discoder translate: \"IF\" node is not independent operator\n");
         return false;
     }
     fprintf_tab(stream, tab_shift);
@@ -198,7 +189,7 @@ bool translate_if(const AST_node *const node, FILE *const stream, const name_lis
 
     if (R->type != IF_ELSE)
     {
-        fprintf_err("right subtree of IF node is not IF_ELSE node\n");
+        fprintf_err("discoder translate: right subtree of IF node is not IF_ELSE node\n");
         return false;
     }
 
@@ -238,7 +229,7 @@ bool translate_while(const AST_node *const node, FILE *const stream, const name_
 
     if (!independent_op)
     {
-        fprintf_err("\"WHILE\" node is not independent operator\n");
+        fprintf_err("discoder translate: \"WHILE\" node is not independent operator\n");
         return false;
     }
     fprintf_tab(stream, tab_shift);
@@ -272,7 +263,7 @@ bool translate_operator(const AST_node *const node, FILE *const stream, const na
     {
         if (!independent_op)
         {
-            fprintf(stderr, "\"%s\" node is not independent operator\n", OPERATOR_NAMES[$op_type]);
+            fprintf(stderr, "discoder translate: \"%s\" node is not independent operator\n", OPERATOR_NAMES[$op_type]);
             return false;
         }
         fprintf_tab(stream, tab_shift);
@@ -300,7 +291,7 @@ bool translate_operator(const AST_node *const node, FILE *const stream, const na
 
     if (independent_op)
     {
-        fprintf(stderr, "\"%s\" is independent operator\n", OPERATOR_NAMES[$op_type]);
+        fprintf(stderr, "discoder translate: \"%s\" is independent operator\n", OPERATOR_NAMES[$op_type]);
         return false;
     }
     if (L != nullptr && L->type == OPERATOR && OP_PRIORITY[L->value.op_type] < OP_PRIORITY[$op_type])
@@ -336,7 +327,7 @@ bool translate_var_decl(const AST_node *const node, FILE *const stream, const na
 
     if (!independent_op)
     {
-        fprintf_err("\"VAR_DECL\" is not independent operator\n");
+        fprintf_err("discoder translate: \"VAR_DECL\" is not independent operator\n");
         return false;
     }
     fprintf_tab(stream, tab_shift);
@@ -344,7 +335,7 @@ bool translate_var_decl(const AST_node *const node, FILE *const stream, const na
 
     if (var_store->size <= $var_index)
     {
-        fprintf_err("index of variable is more than size of variable store\n");
+        fprintf_err("discoder translate: index of variable is more than size of variable store\n");
         return false;
     }
     fprintf(stream, "%s", var_store->word[$var_index].name);
@@ -368,14 +359,14 @@ bool translate_func_decl(const AST_node *const node, FILE *const stream, const n
 
     if (!independent_op)
     {
-        fprintf_err("\"FUNC_DECL\" is not independent operator\n");
+        fprintf_err("discoder translate: \"FUNC_DECL\" is not independent operator\n");
     }
     fprintf_tab(stream, tab_shift);
     fprintf    (stream, "BARCELONA ");
 
     if ($func_index >= func_store->size)
     {
-        fprintf_err("index of function is more than size of function store\n");
+        fprintf_err("discoder translate: index of function is more than size of function store\n");
         return false;
     }
     fprintf(stream, "%s(", func_store->word[$func_index].name);
@@ -408,7 +399,7 @@ bool translate_func_call(const AST_node *const node, FILE *const stream, const n
     if (independent_op) fprintf_tab(stream, tab_shift);
     if (func_store->size <= $func_index)
     {
-        fprintf_err("index of function is more than size of function store\n");
+        fprintf_err("discoder translate: index of function is more than size of function store\n");
         return false;
     }
     fprintf(stream, "%s(", func_store->word[$func_index].name);
@@ -460,7 +451,7 @@ bool translate_return(const AST_node *const node, FILE *const stream, const name
 
     if (!independent_op)
     {
-        fprintf_err("\"RETURN\" node is not independent operator\n");
+        fprintf_err("discoder translate: \"RETURN\" node is not independent operator\n");
         return false;
     }
     fprintf_tab(stream, tab_shift);
@@ -496,12 +487,12 @@ bool discoder_parse(name_list *const  var_store,
     int var_num = 0;
     if (!get_buff_int(buff, buff_size, buff_pos, &var_num))
     {
-        fprintf_err("expected number of variable names\n");
+        fprintf_err("discoder_parse: expected number of variable names\n");
         parse_err_exit
     }
     if (var_num < 0)
     {
-        fprintf_err("invalid number of variable names\n");
+        fprintf_err("discoder_parse: invalid number of variable names\n");
         parse_err_exit
     }
     if (!parse_name_list(var_store, var_num, buff, buff_size, buff_pos)) { parse_err_exit }
@@ -509,12 +500,12 @@ bool discoder_parse(name_list *const  var_store,
     int func_num = 0;
     if (!get_buff_int(buff, buff_size, buff_pos, &func_num))
     {
-        fprintf_err("expected number of function names\n");
+        fprintf_err("discoder_parse: expected number of function names\n");
         parse_err_exit
     }
     if (func_num < 0)
     {
-        fprintf_err("invalid number of function names\n");
+        fprintf_err("discoder_parse: invalid number of function names\n");
         parse_err_exit
     }
     if (!parse_name_list(func_store, func_num, buff, buff_size, buff_pos)) { parse_err_exit }
@@ -539,7 +530,7 @@ bool parse_name_list(name_list *const name_store, const int name_num, const char
         if (get_ast_word(buff, buff_size, buff_pos, &name_beg, &name_len)) name_list_push(name_store, name_beg, name_len);
         else
         {
-            fprintf_err("expected name\n");
+            fprintf_err("discoder_parse: expected name\n");
             return false;
         }
     }
