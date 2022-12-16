@@ -4,6 +4,62 @@
 #include "ast.h"
 
 //===========================================================================================================================
+// CONST
+//===========================================================================================================================
+
+static const char *AST_OPERATOR_TYPE_NAMES[] =
+{
+    "-"                 ,
+    "+"                 , // ADD
+    "-"                 , // SUB
+    "*"                 , // MUL
+    "/"                 , // DIV
+    "^"                 , // POW
+
+    "CHECK_BEGIN"       , // INPUT
+    "CHECK_OVER"        , // OUTPUT
+
+    "GOAL"              , // OP_EQUAL
+    ">"                 , // OP_ABOVE
+    "<"                 , // OP_BELOW
+    "GOAL_INSIDE"       , // OP_ABOVE_EQUAL
+    "GOAL_OFFSIDE"      , // OP_BELOW_EQUAL
+    "NO_GOAL"           , // OP_NOT_EQUAL
+    "!"                 , // OP_NOT
+
+    "GOAL_OR_ASSIST"    , // OP_OR
+    "GOAL_PLUS_ASSIST"  , // OP_AND
+
+    "="                 , // ASSIGNMENT
+};
+
+static const int OP_PRIORITY[] =
+{
+    0   ,
+    5   ,   // ADD
+    5   ,   // SUB
+    6   ,   // MUL
+    6   ,   // DIV
+    7   ,   // POW
+
+    0   ,   // INPUT
+    0   ,   // OUTPUT
+
+    3   ,   // OP_EQUAL
+    4   ,   // OP_ABOVE
+    4   ,   // OP_BELOW
+    4   ,   // OP_ABOVE_EQUAL
+    4   ,   // OP_BELOW_EQUAL
+    3   ,   // OP_NOT_EQUAL
+    8   ,   // OP_NOT
+
+    1   ,   // OP_OR
+    2   ,   // OP_AND
+
+    0   ,   // ASSIGNMENT
+};
+
+//===========================================================================================================================
 // STRUCT
 //===========================================================================================================================
 
@@ -21,17 +77,55 @@ struct name_list        // список имен
 };
 
 //===========================================================================================================================
+// TRANSLATER
+//===========================================================================================================================
+
+bool discoder_translate (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                         const name_list *const func_store, const int  tab_shift = 0,
+                                                                                                            const bool independent_op = true );
+
+bool translate_fictional        (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+bool translate_number           (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+bool translate_variable         (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+bool translate_if               (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+bool translate_while            (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+bool translate_operator         (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+bool translate_var_decl         (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+bool translate_func_decl        (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+bool translate_func_call        (const AST_node *const node, FILE *const stream, const name_list *const  var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+bool translate_func_args_params (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    int *const arg_param_cnt );
+bool translate_return           (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                 const name_list *const func_store, const int  tab_shift,
+                                                                                                                    const bool independent_op);
+
+//===========================================================================================================================
 // PARSE
 //===========================================================================================================================
 
 bool discoder_parse  (name_list *const  var_store,
                       name_list *const func_store,
-                      AST_node **const       tree, const char *buff, const int buff_size, int *const buff_pos);
-bool parse_variables (name_list *const  var_store,
-                      const        int    var_num, const char *buff, const int buff_size, int *const buff_pos);
-bool parse_functions (name_list *const func_store,
-                      const        int   func_num, const char *buff, const int buff_size, int *const buff_pos);
-bool parse_arguments (const        int    arg_num, const char *buff, const int buff_size, int *const buff_pos);
+                      AST_node **const       tree,                     const char *buff, const int buff_size, int *const buff_pos);
+bool parse_name_list (name_list *const name_store, const int name_num, const char *buff, const int buff_size, int *const buff_pos);
 
 //===========================================================================================================================
 // NAME_LIST_CTOR_DTOR
