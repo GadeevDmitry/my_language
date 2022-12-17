@@ -6,7 +6,7 @@ DISCODER = src/discoder
 #lib
 LOG      = lib/logs/log
 STACK    = lib/stack/stack
-RW	     = lib/read_write/read_write
+RW       = lib/read_write/read_write
 ALG      = lib/algorithm/algorithm
 
 LIB_CPP  = $(LOG).cpp $(STACK).cpp $(RW).cpp $(ALG).cpp
