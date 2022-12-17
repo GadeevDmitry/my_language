@@ -101,9 +101,6 @@ static const char *LEXIS_GRAPHVIZ_HEADER = "digraph {\n"
                                            "splines=ortho\n"
                                            "node[shape=record, style=\"rounded, filled\", fontsize=8]\n";
 
-
-static const char *MAIN_FUNCTION = "CAMP_NOU";
-
 //===========================================================================================================================
 // STRUCT
 //===========================================================================================================================
