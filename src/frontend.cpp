@@ -499,6 +499,25 @@ int func_name_list_get_arg_num(const func_name_list *const func_store, const int
     return func_store->func[func_index].arg_num;
 }
 
+bool func_name_list_check_main_func(const func_name_list *const func_store)
+{
+    assert(func_store != nullptr);
+
+    int main_func_len = strlen(MAIN_FUNCTION);
+
+    for (int i = 0; i < func_store->size; ++i)
+    {
+        const func_info *const cur_func = func_store->func+i;
+
+        if (cur_func->name_len == main_func_len && cur_func->arg_num == 0 &&
+            !strncmp(cur_func->name, MAIN_FUNCTION, main_func_len))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 //===========================================================================================================================
 // FUNC_NAME_LIST CLOSED
 //===========================================================================================================================
@@ -593,6 +612,9 @@ void dictionary_dtor(dictionary *const name_store)
 
 #define fprintf_err(line, message) fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL message, line)
 
+bool MEET_RETURN = false;   // true, если встретился оператор return в области видимости 1
+                            // нужен для отслеживания наличия возвращаемого значения в функции
+
 //---------------------------------------------------------------------------------------------------------------------------
 #define general_err_exit                                                                                                    \
         AST_tree_dtor  (root);                                                                                              \
@@ -623,6 +645,11 @@ AST_node *parse_general(const source *const code, dictionary *const name_store)
 
         fprintf_err(lexis_data[token_cnt].token_line, "undefined function or variable declaration\n");
         general_err_exit;
+    }
+    if (!func_name_list_check_main_func(&$func_store))
+    {
+        fprintf(stderr, TERMINAL_RED "ERROR: " TERMINAL_CANCEL "there is no main function %s()\n", MAIN_FUNCTION);
+        general_err_exit
     }
     return root;
 }
@@ -719,6 +746,12 @@ bool parse_func_decl(dictionary *const name_store, const source *const code, int
         fprintf_err($cur_token.token_line, "expected '}' after function operators\n");
         func_decl_err_exit
     }
+    if (!MEET_RETURN)
+    {
+        fprintf_err($cur_token.token_line, "expected return value at the end of function\n");
+        func_decl_err_exit
+    }
+    MEET_RETURN = false;
     *token_cnt += 1;
     var_name_list_clear_var(&$var_store, $scope);
     $scope      = 0;
@@ -1269,6 +1302,7 @@ bool parse_op_return(dictionary *const name_store, const source *const code, int
         return_err_exit
     }
     *token_cnt += 1;
+    if ($scope == 1) MEET_RETURN = true;
     return true;
 }
 #undef  return_err_exit

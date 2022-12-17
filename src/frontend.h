@@ -101,6 +101,9 @@ static const char *LEXIS_GRAPHVIZ_HEADER = "digraph {\n"
                                            "splines=ortho\n"
                                            "node[shape=record, style=\"rounded, filled\", fontsize=8]\n";
 
+
+static const char *MAIN_FUNCTION = "CAMP_NOU";
+
 //===========================================================================================================================
 // STRUCT
 //===========================================================================================================================
@@ -259,17 +262,20 @@ void arg_list_dtor (arg_list *const arg_store);
 
 // Добавляет функцию cur_token в список имен func_store
 // Возвращает индекс имени в списке имен
-int func_name_list_add_func          (func_name_list *const func_store, const source *const code, const token *const cur_token);
+int  func_name_list_add_func        (func_name_list *const func_store, const source *const code, const token *const cur_token);
 
 //Возвращает индекс функции cur_token в списке имен func_store, если она объявлена, и -1 иначе
-int func_name_list_defined_func      (func_name_list *const func_store, const source *const code, const token *const cur_token);
+int  func_name_list_defined_func    (func_name_list *const func_store, const source *const code, const token *const cur_token);
 
 //Добавляет аргументы функции с номером func_index в списке имен func_store
 //Аргументы берутся из дерева аргументов node
-void func_name_list_add_args         (func_name_list *const func_store, const int func_index, AST_node *const node);
+void func_name_list_add_args        (func_name_list *const func_store, const int func_index, AST_node *const node);
 
 //Возвращает количество аргументов функции с номером func_index в списке имен func_store
-int func_name_list_get_arg_num (const func_name_list *const func_store, const int func_index);
+int  func_name_list_get_arg_num     (const func_name_list *const func_store, const int func_index);
+
+//Возвращает true, если нашлась главная функция, то есть функция с именем MAIN_FUNCTION и с 0 количеством аргументов
+bool func_name_list_check_main_func (const func_name_list *const func_store);
 
 //===========================================================================================================================
 // FUNC_NAME_LIST CLOSED
