@@ -386,7 +386,7 @@ bool translate_reg_plus_int(translator *const my_asm, int *const token_cnt, REGI
     assert(int_arg   != nullptr);
     assert(cmd_param != nullptr);
 
-    if (cur_token.type == REG_NAME)
+    if (cur_token.type == REG_NAME && is_int_reg(cur_token.value.reg_num))
     {
         *cmd_param  = (*cmd_param) | (1 << PARAM_REG);
         *reg_arg    = cur_token.value.reg_num;
@@ -442,7 +442,7 @@ bool translate_int_plus_reg(translator *const my_asm, int *const token_cnt, REGI
             *token_cnt += 1;
             check_inside
 
-            if (cur_token.type == REG_NAME)
+            if (cur_token.type == REG_NAME && is_int_reg(cur_token.value.reg_num))
             {
                 *cmd_param  = (*cmd_param) | (1 << PARAM_REG);
                 *reg_arg    = cur_token.value.reg_num;
@@ -450,7 +450,7 @@ bool translate_int_plus_reg(translator *const my_asm, int *const token_cnt, REGI
 
                 return true;
             }
-            fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "invalid reg-arg\n", cur_token.token_line);
+            fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "invalid int-reg-arg\n", cur_token.token_line);
             *token_cnt += 1;
             return false;
         }

@@ -6,20 +6,23 @@
 /*===========================================================================================================================*/
 
 typedef   double cpu_type;
-static const int REG_NUMBER = 8;
+
+static const int REG_NUMBER     = 8;
+static const int INT_REG_NUMBER = 4;
 
 enum REGISTER   // регистры для хранения целых чисел
 {
     ERR_REG ,
 
-    RAX     ,
-    RBX     ,
-    RCX     ,
-    RDX     ,
-    REX     ,
-    RFX     ,
-    RGX     ,
-    RHX     ,
+    RAX     ,   // double-type registers
+    RBX     ,   //
+    RCX     ,   //
+    RDX     ,   //
+
+    REX     ,   // int-type registers
+    RFX     ,   //
+    RGX     ,   //
+    RHX     ,   //
 };
 
 enum ASM_CMD
@@ -86,5 +89,12 @@ void executer_dtor(executer *const cpu);
 
 void executer_add_cmd  (executer *const cpu, const void *const cmd, const size_t cmd_size);
 void executer_pull_cmd (executer *const cpu, void *const   pull_in, const size_t pull_size);
+
+/*===========================================================================================================================*/
+// DEFINE_REGISTER_TYPE
+/*===========================================================================================================================*/
+
+bool is_dbl_reg (const REGISTER reg);
+bool is_int_reg (const REGISTER reg);
 
 #endif //CPU

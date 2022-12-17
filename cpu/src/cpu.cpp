@@ -80,3 +80,19 @@ void executer_pull_cmd(executer *const cpu, void *const pull_in, const size_t pu
     memcpy(pull_in, (const char *) cpu->cmd + cpu->pc, pull_size);
     cpu->pc += (int) pull_size;
 }
+
+/*===========================================================================================================================*/
+// DEFINE_REGISTER_TYPE
+/*===========================================================================================================================*/
+
+bool is_dbl_reg(const REGISTER reg)
+{
+    if (reg == ERR_REG) return false;
+
+    return !is_int_reg(reg);
+}
+
+bool is_int_reg(const REGISTER reg)
+{
+    return reg >= REX;
+}

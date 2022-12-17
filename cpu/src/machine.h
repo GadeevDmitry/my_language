@@ -12,13 +12,15 @@
 #define _DATA_STACK(computer) computer->data_stack
 #define        _RAM(computer) computer->ram
 #define        _CPU(computer) computer->cpu
-#define        _REG(computer) computer->reg
+#define    _INT_REG(computer) computer->int_reg
+#define    _DBL_REG(computer) computer->dbl_reg
 
 #define $call_stack _CALL_STACK(computer)
 #define $data_stack _DATA_STACK(computer)
 #define $ram               _RAM(computer)
 #define $cpu               _CPU(computer)
-#define $reg               _REG(computer)
+#define $int_reg       _INT_REG(computer)
+#define $dbl_reg       _DBL_REG(computer)
 
 /*===========================================================================================================================*/
 // CONST
@@ -32,11 +34,12 @@ const int RAM_SIZE = 10000;
 
 struct machine
 {
-    stack    call_stack;            // стек вызовов
-    stack    data_stack;            // стек с данными
-    executer cpu;                   // структура, содержащая инструкции и параметры
-    cpu_type ram[RAM_SIZE];         // оперативка
-    int      reg[REG_NUMBER + 1];   // регистры
+    stack    call_stack;                // стек вызовов
+    stack    data_stack;                // стек с данными
+    executer cpu;                       // структура, содержащая инструкции и параметры
+    cpu_type ram    [RAM_SIZE];         // оперативка
+    int      int_reg[REG_NUMBER + 1];   // целочисленные  регистры
+    double   dbl_reg[REG_NUMBER + 1];   // действительные регистры
 };
 
 /*===========================================================================================================================*/

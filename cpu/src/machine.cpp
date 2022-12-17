@@ -154,7 +154,12 @@ bool execute_push(machine *const computer, const unsigned char cmd)
         if (cmd & (1 << PARAM_REG))
         {
             check_reg_arg(reg_arg, PUSH);
-            int_param += $reg[reg_arg];
+            if (!is_int_reg(reg_arg))
+            {
+                fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL, "expected int register, but it is double\n");
+                return false;
+            }
+            int_param += $int_reg[reg_arg];
         }
         check_ram_index(int_param, PUSH);
         stack_push(&$data_stack, &$ram[int_param]);
@@ -164,7 +169,8 @@ bool execute_push(machine *const computer, const unsigned char cmd)
     if (cmd & (1 << PARAM_REG))
     {
         check_reg_arg(reg_arg, PUSH);
-        dbl_param += $reg[reg_arg];
+        if (is_int_reg(reg_arg)) dbl_param += $int_reg[reg_arg];
+        else                     dbl_param += $dbl_reg[reg_arg];
     }
     stack_push(&$data_stack, &dbl_param);
     return true;
@@ -193,7 +199,12 @@ bool execute_pop(machine *const computer, const unsigned char cmd)
         if (cmd & (1 << PARAM_REG))
         {
             check_reg_arg(reg_arg, POP);
-            num_param += $reg[reg_arg];
+            if (!is_int_reg(reg_arg))   // только целочисленные регистры могут быть индексом в RAM
+            {
+                fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL, "expected int register, but it is double\n");
+                return false;
+            }
+            num_param += $int_reg[reg_arg];
         }
         if (cmd & (1 << PARAM_NUM)) num_param += cpu_arg;
 
@@ -203,11 +214,12 @@ bool execute_pop(machine *const computer, const unsigned char cmd)
     }
     if (cmd & (1 << PARAM_REG))
     {
-        check_reg_arg(reg_arg, POP);
-        $reg[reg_arg] = (int) *(cpu_type *) stack_pop(&$data_stack); // кладём действительное число в целочисленный регистр
-        return true;                                                 // (при генерации ассемблерного кода не используется)
+        check_reg_arg (reg_arg, POP);
+        if (is_int_reg(reg_arg)) $int_reg[reg_arg] = (int) *(cpu_type *) stack_pop(&$data_stack); // кладём действительное число в целочисленный регистр
+        else                     $dbl_reg[reg_arg] =       *(cpu_type *) stack_pop(&$data_stack);
+        return true;
     }
-    stack_pop(&$data_stack);
+    stack_pop(&$data_stack); // void case
     return true;
 }
 
@@ -485,8 +497,8 @@ bool machine_ctor(machine *const computer, const char *execute_file)
 
     no_err = executer_ctor(&$cpu, execute_file);
 
-    for (int i = 0; i <  RAM_SIZE  ; ++i) $ram[i] = 0;
-    for (int i = 0; i <= REG_NUMBER; ++i) $reg[i] = 0;
+    for (int i = 0; i <  RAM_SIZE  ; ++i)     $ram[i] = 0;
+    for (int i = 0; i <= REG_NUMBER; ++i) $int_reg[i] = 0;
 
     if (no_err) return true;
 
