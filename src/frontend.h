@@ -22,7 +22,7 @@
 #define key_word_val     value.key_word
 #define key_dbl_char_val value.key_dbl_char
 #define key_char_val     value.key_char
-#define int_num_val      value.int_num
+#define dbl_num_val      value.dbl_num
 #define token_len_val    value.token_len
 
 #define $cur_token       lexis_data[*token_cnt]
@@ -43,7 +43,7 @@ enum TOKEN_TYPE
     KEY_WORD        ,
     KEY_CHAR        ,
     KEY_CHAR_DOUBLE ,
-    INT_NUM         ,
+    DBL_NUM         ,
     UNDEF_TOKEN     ,
 };
 static const char *TOKEN_TYPE_NAMES[] =
@@ -51,12 +51,11 @@ static const char *TOKEN_TYPE_NAMES[] =
     "KEY WORD"          ,
     "KEY CHAR"          ,
     "KEY CHAR DOUBLE"   ,
-    "INT NUM"           ,
+    "DBL NUM"           ,
     "UNDEF"             ,
 };
 
 static const char *KEY_CHAR_NAMES     = ";," "(){}" "+-*/^" "!=><" "|&" "#";
-
 static const char *KEY_WORD_NAMES[]   =
 {
     "BARCELONA"         ,   // int
@@ -69,7 +68,7 @@ static const char *KEY_WORD_NAMES[]   =
 };
 enum KEY_WORD_TYPE
 {
-    INT     ,
+    DOUBLE  ,
     IF      ,
     ELSE    ,
     WHILE   ,
@@ -118,7 +117,7 @@ struct token
         KEY_WORD_TYPE            key_word;  // .type = KEY_WORD
         KEY_CHAR_DOUBLE_TYPE key_dbl_char;  // .type = KEY_CHAR_DOUBLE
         char                     key_char;  // .type = KEY_CHAR
-        int                       int_num;  // .type = INT_NUM
+        double                    dbl_num;  // .type = DBL_NUM
         int                     token_len;  // .type = UNDEF_TOKEN
     }
     value;
@@ -340,7 +339,7 @@ bool token_mul_div(const token cur_token);
 bool token_add_sub(const token cur_token);
 bool token_pow    (const token cur_token);
 
-bool token_int    (const token cur_token);
+bool token_dbl    (const token cur_token);
 bool token_if     (const token cur_token);
 bool token_else   (const token cur_token);
 bool token_while  (const token cur_token);
@@ -391,7 +390,7 @@ void lexical_analyzer    (source *const code);
 int  get_another_token   (source *const code);
 bool get_key_word_type   (source *const code, const int token_beg, const int token_len, KEY_WORD_TYPE        *const type = nullptr);
 bool get_key_double_char (source *const code, const int token_beg, const int token_len, KEY_CHAR_DOUBLE_TYPE *const type = nullptr);
-bool get_int_num         (source *const code, const int token_beg, const int token_len, int                  *const num  = nullptr);
+bool get_dbl_num         (source *const code, const int token_beg, const int token_len, double               *const  num = nullptr);
 bool comment             (source *const code);
 
 bool key_char            (const char to_check);
@@ -404,7 +403,7 @@ bool split_char          (const char to_check);
 void create_key_word_token        (source *const code, const int token_beg, const int token_len);
 void create_key_double_char_token (source *const code, const int token_beg, const int token_len);
 void create_key_char_token        (source *const code);
-void create_int_num_token         (source *const code, const int token_beg, const int token_len);
+void create_dbl_num_token         (source *const code, const int token_beg, const int token_len);
 void create_undef_token           (source *const code, const int token_beg, const int token_len);
 
 //===========================================================================================================================

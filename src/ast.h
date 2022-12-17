@@ -8,7 +8,7 @@
 #define $type       node->type
 
 #define $fictional  node->value.fictional
-#define $int_num    node->value.int_num
+#define $dbl_num    node->value.dbl_num
 #define $var_index  node->value.var_index
 #define $func_index node->value.func_index
 #define $op_type    node->value.op_type
@@ -93,7 +93,7 @@ struct AST_node
     union
     {
         int         fictional;  // фиктивное значение                               .type = FICTIONAL, OP_IF, IF_ELSE, OP_WHILE, OP_RETURN
-        int           int_num;  // значение числа                                   .type = NUMBER
+        double        dbl_num;  // значение числа                                   .type = NUMBER
         int         var_index;  // индекс имени переменной в списке имен переменных .type = VARIABLE, VAR_DECL
         int        func_index;  // индекс имени функции    в списке имен функций    .type = FUNC_CALL, FUNC_DECL
         OPERATOR_TYPE op_type;  // тип оператора                                    .type = OPERATOR
@@ -121,29 +121,29 @@ AST_node *new_##ast_node_type##_AST_node(const value_field_type value, AST_node 
                                                                        AST_node *const right = nullptr,                     \
                                                                        AST_node *const prev  = nullptr);
 
-AST_NODE_CTOR_DECLARATION(FICTIONAL, int);
-AST_NODE_CTOR_DECLARATION(NUMBER   , int);
-AST_NODE_CTOR_DECLARATION(VARIABLE , int);
-AST_NODE_CTOR_DECLARATION(OP_IF    , int);
-AST_NODE_CTOR_DECLARATION(IF_ELSE  , int);
-AST_NODE_CTOR_DECLARATION(OP_WHILE , int);
+AST_NODE_CTOR_DECLARATION(FICTIONAL,    int);
+AST_NODE_CTOR_DECLARATION(NUMBER   , double);
+AST_NODE_CTOR_DECLARATION(VARIABLE ,    int);
+AST_NODE_CTOR_DECLARATION(OP_IF    ,    int);
+AST_NODE_CTOR_DECLARATION(IF_ELSE  ,    int);
+AST_NODE_CTOR_DECLARATION(OP_WHILE ,    int);
 AST_NODE_CTOR_DECLARATION(OPERATOR , OPERATOR_TYPE);
-AST_NODE_CTOR_DECLARATION(VAR_DECL , int);
-AST_NODE_CTOR_DECLARATION(FUNC_CALL, int);
-AST_NODE_CTOR_DECLARATION(FUNC_DECL, int);
-AST_NODE_CTOR_DECLARATION(OP_RETURN, int);
+AST_NODE_CTOR_DECLARATION(VAR_DECL ,    int);
+AST_NODE_CTOR_DECLARATION(FUNC_CALL,    int);
+AST_NODE_CTOR_DECLARATION(FUNC_DECL,    int);
+AST_NODE_CTOR_DECLARATION(OP_RETURN,    int);
 
-AST_NEW_NODE_DECLARATION(FICTIONAL, int);
-AST_NEW_NODE_DECLARATION(NUMBER   , int);
-AST_NEW_NODE_DECLARATION(VARIABLE , int);
-AST_NEW_NODE_DECLARATION(OP_IF    , int);
-AST_NEW_NODE_DECLARATION(IF_ELSE  , int);
-AST_NEW_NODE_DECLARATION(OP_WHILE , int);
+AST_NEW_NODE_DECLARATION(FICTIONAL,     int);
+AST_NEW_NODE_DECLARATION(NUMBER   ,  double);
+AST_NEW_NODE_DECLARATION(VARIABLE ,     int);
+AST_NEW_NODE_DECLARATION(OP_IF    ,     int);
+AST_NEW_NODE_DECLARATION(IF_ELSE  ,     int);
+AST_NEW_NODE_DECLARATION(OP_WHILE ,     int);
 AST_NEW_NODE_DECLARATION(OPERATOR , OPERATOR_TYPE);
-AST_NEW_NODE_DECLARATION(VAR_DECL , int);
-AST_NEW_NODE_DECLARATION(FUNC_CALL, int);
-AST_NEW_NODE_DECLARATION(FUNC_DECL, int);
-AST_NEW_NODE_DECLARATION(OP_RETURN, int);
+AST_NEW_NODE_DECLARATION(VAR_DECL ,     int);
+AST_NEW_NODE_DECLARATION(FUNC_CALL,     int);
+AST_NEW_NODE_DECLARATION(FUNC_DECL,     int);
+AST_NEW_NODE_DECLARATION(OP_RETURN,     int);
 
 #undef AST_NODE_DECLARATION
 #undef AST_NEW_NODE_DECLARATION
@@ -159,6 +159,7 @@ AST_node *AST_parse   (const char *buff, const int buff_size, int *const buff_po
 void      AST_convert (const AST_node *const node, FILE *const stream, const int tab_shift = 0);
 
 bool get_buff_int     (const char *buff, const int buff_size, int *const buff_pos, int *const    int_num);
+bool get_buff_dbl     (const char *buff, const int buff_size, int *const buff_pos, double *const dbl_num);
 bool get_ast_word     (const char *buff, const int buff_size, int *const buff_pos, const char **name_beg = nullptr,
                                                                                    int *const   name_len = nullptr);
 void skip_ast_spaces  (const char *buff, const int buff_size, int *const buff_pos);

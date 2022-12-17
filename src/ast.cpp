@@ -91,7 +91,7 @@ AST_node *new_##ast_node_type##_AST_node(const value_field_type value, AST_node 
 }
 
 AST_NODE_CTOR($fictional ,           int, FICTIONAL)
-AST_NODE_CTOR($int_num   ,           int, NUMBER   )
+AST_NODE_CTOR($dbl_num   ,        double, NUMBER   )
 AST_NODE_CTOR($var_index ,           int, VARIABLE )
 AST_NODE_CTOR($fictional ,           int, OP_IF    )
 AST_NODE_CTOR($fictional ,           int, IF_ELSE  )
@@ -103,7 +103,7 @@ AST_NODE_CTOR($func_index,           int, FUNC_DECL)
 AST_NODE_CTOR($fictional ,           int, OP_RETURN)
 
 AST_NEW_NODE($fictional ,           int, FICTIONAL)
-AST_NEW_NODE($int_num   ,           int, NUMBER   )
+AST_NEW_NODE($dbl_num   ,        double, NUMBER   )
 AST_NEW_NODE($var_index ,           int, VARIABLE )
 AST_NEW_NODE($fictional ,           int, OP_IF    )
 AST_NEW_NODE($fictional ,           int, IF_ELSE  )
@@ -141,7 +141,9 @@ void AST_convert(const AST_node *const node, FILE *const stream, const int tab_s
     assert(node   != nullptr);
     assert(stream != nullptr);
 
-    int node_value = 0;
+    int    node_value = 0;
+    double  num_value = 0;
+
     switch ($type)
     {
         case FICTIONAL:
@@ -150,7 +152,7 @@ void AST_convert(const AST_node *const node, FILE *const stream, const int tab_s
         case OP_WHILE :
         case OP_RETURN: node_value = 0;
                         break;
-        case NUMBER   : node_value = $int_num;
+        case NUMBER   : num_value = $dbl_num;
                         break;
         case VARIABLE :
         case VAR_DECL : node_value = $var_index;
@@ -164,7 +166,9 @@ void AST_convert(const AST_node *const node, FILE *const stream, const int tab_s
     }
 
     fprintf_tab(stream, tab_shift);
-    fprintf    (stream, "{ %d %d\n", $type, node_value);
+    
+    if ($type != NUMBER) fprintf(stream, "{ %d %d\n" , $type, node_value);
+    else                 fprintf(stream, "{ %d %lf\n", $type,  num_value);
 
     if (L != nullptr) AST_convert(L, stream, tab_shift + 1);
     if (R != nullptr) AST_convert(R, stream, tab_shift + 1);
@@ -213,24 +217,36 @@ static bool AST_parse_dfs(const char *buff, const int buff_size, int *const buff
         AST_parse_dfs_err_exit
     }
 
-    int node_type = 0;
-    int node_val  = 0;
+    int   node_type = 0;
+    int   node_val  = 0;
+    double num_val  = 0;
 
     if (!get_buff_int(buff, buff_size, buff_pos, &node_type))
     {
         fprintf_err("AST parser: expected node type\n");
         AST_parse_dfs_err_exit
     }
-    if (!get_buff_int(buff, buff_size, buff_pos, &node_val))
+    if (node_type == NUMBER)
     {
-        fprintf_err("AST parser: expected node value\n");
-        AST_parse_dfs_err_exit
+        if (!get_buff_dbl(buff, buff_size, buff_pos, &num_val))
+        {
+            fprintf_err("AST parser: expected double node value\n");
+            AST_parse_dfs_err_exit
+        }
+    }
+    else
+    {
+        if (!get_buff_int(buff, buff_size, buff_pos, &node_val))
+        {
+            fprintf_err("AST parser: expected int node value\n");
+            AST_parse_dfs_err_exit
+        }
     }
 
     switch (node_type)
     {
         case FICTIONAL: *node = new_FICTIONAL_AST_node(node_val); break;
-        case NUMBER   : *node = new_NUMBER_AST_node   (node_val); break;
+        case NUMBER   : *node = new_NUMBER_AST_node   ( num_val); break;
         case VARIABLE : *node = new_VARIABLE_AST_node (node_val); break;
         case OP_IF    : *node = new_OP_IF_AST_node    (node_val); break;
         case IF_ELSE  : *node = new_IF_ELSE_AST_node  (node_val); break;
@@ -298,6 +314,24 @@ bool get_buff_int(const char *buff, const int buff_size, int *const buff_pos, in
 
     if (*buff_pos >= buff_size)                                   return false;
     if (sscanf(buff + *buff_pos, "%d%n", int_num, &num_len) != 1) return false;
+
+    *buff_pos += num_len;
+    return true;
+}
+
+bool get_buff_dbl(const char *buff, const int buff_size, int *const buff_pos, double *const dbl_num)
+{
+    assert(buff     != nullptr);
+    assert(buff_pos != nullptr);
+    assert(dbl_num  != nullptr);
+
+    skip_ast_spaces(buff, buff_size, buff_pos);
+
+    *dbl_num    = 0;
+    int num_len = 0;
+
+    if (*buff_pos >= buff_size)                                    return false;
+    if (sscanf(buff + *buff_pos, "%lf%n", dbl_num, &num_len) != 1) return false;
 
     *buff_pos += num_len;
     return true;
@@ -492,7 +526,7 @@ static void get_node_value_message(const AST_node *const node, char *const node_
         case OP_WHILE:
         case OP_RETURN: sprintf(node_value, "'-'");
                         break;
-        case NUMBER:    sprintf(node_value, "%d", $int_num);
+        case NUMBER:    sprintf(node_value, "%lf", $dbl_num);
                         break;
         case VARIABLE:
         case VAR_DECL:  sprintf(node_value, "var_index: %d", $var_index);

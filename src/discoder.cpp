@@ -8,7 +8,6 @@
 #include "../lib/logs/log.h"
 #include "../lib/read_write/read_write.h"
 #include "../lib/algorithm/algorithm.h"
-#include "../lib/graphviz_dump/graphviz_dump.h"
 
 #include "discoder.h"
 #include "terminal_colors.h"
@@ -131,7 +130,7 @@ bool translate_number(const AST_node *const node, FILE *const stream, const name
         fprintf_err("discoder translate: \"NUMBER\" node is independent operator\n");
         return false;
     }
-    fprintf(stream, "%d", $int_num);
+    fprintf(stream, "%lf", $dbl_num);
 
     if (!discoder_translate(L, stream, var_store, func_store, tab_shift, independent_op)) return false;
     if (!discoder_translate(R, stream, var_store, func_store, tab_shift, independent_op)) return false;
@@ -293,6 +292,15 @@ bool translate_operator(const AST_node *const node, FILE *const stream, const na
     {
         fprintf(stderr, "discoder translate: \"%s\" is independent operator\n", OPERATOR_NAMES[$op_type]);
         return false;
+    }
+    if ($op_type == OP_NOT)
+    {
+        fprintf(stream, "!");
+
+        if (!discoder_translate(L, stream, var_store, func_store, tab_shift, false)) return false;
+        if (!discoder_translate(R, stream, var_store, func_store, tab_shift, false)) return false;
+
+        return true;
     }
     if (L != nullptr && L->type == OPERATOR && OP_PRIORITY[L->value.op_type] < OP_PRIORITY[$op_type])
     {

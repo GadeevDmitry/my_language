@@ -101,7 +101,7 @@ op_not       = {!}? operand
 operand      = '('rvalue ')' | function_call | rvalue_token
 
 rvalue_token = number | lvalue
-number       = ['0'-'9']+
+number       = double
 
 //===========================================================================================================================
 // lvalue: return value of variable
@@ -639,7 +639,7 @@ bool parse_var_decl(dictionary *const name_store, const source *const code, int 
 
     const int old_token_cnt = *token_cnt;
 
-    if (!token_int($cur_token)) return true;
+    if (!token_dbl($cur_token)) return true;
     *token_cnt += 1;
 
     if (!(token_undef($cur_token) && token_char($next_token, ';'))) { *token_cnt = old_token_cnt; return true; }
@@ -671,7 +671,7 @@ bool parse_func_decl(dictionary *const name_store, const source *const code, int
 
     const int old_token_cnt = *token_cnt;
 
-    if (!token_int($cur_token)) return true;
+    if (!token_dbl($cur_token)) return true;
     *token_cnt += 1;
 
     if (!(token_undef($cur_token) && token_char($next_token, '('))) { *token_cnt = old_token_cnt; return true; }
@@ -1674,9 +1674,9 @@ bool parse_rvalue_token(dictionary *const name_store, const source *const code, 
     //>>>>>>>>>>>>>>>>>>>>>>>>>>
     log_message("start parse_rvalue_token: old_token_cnt=%d\n", *token_cnt);
     //<<<<<<<<<<<<<<<<<<<<<<<<<<
-    if ($cur_token.type == INT_NUM)
+    if ($cur_token.type == DBL_NUM)
     {
-        *subtree    = new_NUMBER_AST_node($cur_token.int_num_val);
+        *subtree    = new_NUMBER_AST_node($cur_token.dbl_num_val);
         *token_cnt += 1;
         return true;
     }
@@ -1744,7 +1744,7 @@ bool token_mul_div(const token cur_token) { return token_char(cur_token, '*') ||
 bool token_add_sub(const token cur_token) { return token_char(cur_token, '+') || token_char(cur_token, '-'); }
 bool token_pow    (const token cur_token) { return token_char(cur_token, '^'); }
 
-bool token_int    (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == INT   ; }
+bool token_dbl    (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == DOUBLE; }
 bool token_if     (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == IF    ; }
 bool token_else   (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == ELSE  ; }
 bool token_while  (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == WHILE ; }
@@ -1884,7 +1884,7 @@ void lexical_analyzer(source *const code)
             int token_beg = buff_pos;
             int token_len = get_another_token(code);
 
-            if      (get_int_num        (code, token_beg, token_len)) create_int_num_token        (code, token_beg, token_len);
+            if      (get_dbl_num        (code, token_beg, token_len)) create_dbl_num_token        (code, token_beg, token_len);
             else if (get_key_double_char(code, token_beg, token_len)) create_key_double_char_token(code, token_beg, token_len);
             else if (get_key_word_type  (code, token_beg, token_len)) create_key_word_token       (code, token_beg, token_len);
             else                                                      create_undef_token          (code, token_beg, token_len);
@@ -1935,18 +1935,18 @@ bool get_key_double_char(source *const code, const int token_beg, const int toke
     }
     return false;
 }
-                                                                                //default num = nullptr
-bool get_int_num(source *const code, const int token_beg, const int token_len, int *const num)
+                                                                                   //default num = nullptr
+bool get_dbl_num(source *const code, const int token_beg, const int token_len, double *const num)
 {
     assert(code != nullptr);
 
-    int num_ = 0;
-    for (int i = token_beg; i < token_beg + token_len; ++i)
-    {
-        if (!isdigit(buff_data[i])) return false;
-        num_ = 10 * num_ + buff_data[i] - '0';
-    }
-    if (num != nullptr) *num = num_;
+    double dbl_num = 0;
+    int    num_len = 0;
+
+    if (sscanf(buff_data + token_beg, "%lf%n", &dbl_num, &num_len) != 1) return false;
+    if (num_len != token_len)                                            return false;
+
+    if (num != nullptr) *num = dbl_num;
     return true;
 }
 
@@ -2020,15 +2020,15 @@ void create_key_double_char_token(source *const code, const int token_beg, const
     ++lexis_pos;
 }
 
-void create_int_num_token(source *const code, const int token_beg, const int token_len)
+void create_dbl_num_token(source *const code, const int token_beg, const int token_len)
 {
     assert(code != nullptr);
 
-    lexis_data[lexis_pos].type          = INT_NUM;
+    lexis_data[lexis_pos].type          = DBL_NUM;
     lexis_data[lexis_pos].token_beg     = token_beg;
     lexis_data[lexis_pos].token_line    = buff_line;
 
-    get_int_num(code, token_beg, token_len, &lexis_data[lexis_pos].int_num_val);
+    get_dbl_num(code, token_beg, token_len, &lexis_data[lexis_pos].dbl_num_val);
     ++lexis_pos;
 }
 
@@ -2274,7 +2274,7 @@ void graphviz_dump_token(const token *const cur_token, FILE *const stream, const
         case KEY_CHAR:          fillcolor = LIGHT_PINK;
                                     color =   DARK_RED;
                                 break;
-        case INT_NUM :          fillcolor = LIGHT_GREY;
+        case DBL_NUM :          fillcolor = LIGHT_GREY;
                                     color =      BLACK;
                                 break;
         case UNDEF_TOKEN:       fillcolor = LIGHT_ORANGE;
@@ -2320,7 +2320,7 @@ void get_token_value_message(const token *const cur_token, char *const token_val
                                 else if (cur_token->key_char_val == '}') sprintf(token_value, "char: closed fig");
                                 else                                     sprintf(token_value, "char: \\\'%c\\\'", cur_token->key_char_val);
                                 break;
-        case INT_NUM    :       sprintf(token_value, "num: %d", cur_token->int_num_val);
+        case DBL_NUM    :       sprintf(token_value, "num: %lf", cur_token->dbl_num_val);
                                 break;
         case UNDEF_TOKEN:       sprintf(token_value, "len: %d", cur_token->token_len_val);
                                 break;
