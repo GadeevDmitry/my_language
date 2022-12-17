@@ -5,10 +5,10 @@
 // CONST
 /*===========================================================================================================================*/
 
-typedef      int cpu_type;
+typedef   double cpu_type;
 static const int REG_NUMBER = 8;
 
-enum REGISTER
+enum REGISTER   // регистры для хранения целых чисел
 {
     ERR_REG ,
 
@@ -20,20 +20,6 @@ enum REGISTER
     RFX     ,
     RGX     ,
     RHX     ,
-};
-
-static const char *REGISTER_NAMES[] =
-{
-    "ERR_REG"   ,
-
-    "RAX"       ,
-    "RBX"       ,
-    "RCX"       ,
-    "RDX"       ,
-    "REX"       ,
-    "RFX"       ,
-    "RGX"       ,
-    "RHX"       ,
 };
 
 enum ASM_CMD
@@ -66,39 +52,9 @@ enum ASM_CMD
     UNDEF_ASM_CMD   , // 19
 };
 
-static const char *ASM_CMD_NAMES[] =
-{
-    "HLT"           ,
-
-    "IN"            ,
-    "OUT"           ,
-
-    "PUSH"          ,
-    "POP"           ,
-
-    "JMP"           ,
-    "JA"            ,
-    "JAE"           ,
-    "JB"            ,
-    "JBE"           ,
-    "JE"            ,
-    "JNE"           ,
-
-    "CALL"          ,
-    "RET"           ,
-
-    "ADD"           ,
-    "SUB"           ,
-    "MUL"           ,
-    "DIV"           ,
-    "POW"           ,
-
-    "UNDEF_ASM_CMD" ,
-};
-
 enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         5 bit         |
 {                       //----------------+-----------+-----------+-----------------------+----
-    PARAM_INT = 5   ,   //    | PARAM_MEM | PARAM_REG | PARAM_INT |        ASM_CMD        |
+    PARAM_NUM = 5   ,   //    | PARAM_MEM | PARAM_REG | PARAM_NUM |        ASM_CMD        |
     PARAM_REG = 6   ,   //----------------+-----------+-----------+-----------------------+----
     PARAM_MEM = 7   ,
 };

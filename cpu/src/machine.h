@@ -48,9 +48,12 @@ bool execute                   (machine *const computer);
 bool execute_param             (machine *const computer, const unsigned char cmd);
 bool execute_push              (machine *const computer, const unsigned char cmd);
 bool execute_pop               (machine *const computer, const unsigned char cmd);
-bool executer_pull_parameteres (machine *const computer, const unsigned char cmd, bool     *const mem_arg,
+bool executer_pull_reg_int     (machine *const computer, const unsigned char cmd, bool     *const mem_arg,
                                                                                   REGISTER *const reg_arg,
-                                                                                  cpu_type *const cpu_arg);
+                                                                                  int      *const cpu_arg);
+bool executer_pull_reg_dbl     (machine *const computer, const unsigned char cmd, bool     *const mem_arg,
+                                                                                  REGISTER *const reg_arg,
+                                                                                  double   *const cpu_arg);
 bool execute_call              (machine *const computer);
 bool execute_jump              (machine *const computer, const unsigned char cmd);
 bool executer_pull_label       (machine *const computer, int *const label_pc);

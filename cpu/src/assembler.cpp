@@ -39,14 +39,14 @@ int main(const int argc, const char *argv[])
     }
 
     lexical_analyzer   (code);
-  //lexis_text_dump    (code);
-  //lexis_graphviz_dump(code);
+  lexis_text_dump    (code);
+  lexis_graphviz_dump(code);
 
     translator my_asm = {};
 
     if (assembler(code, &my_asm))
     {
-        fwrite (my_asm.cpu.cmd, sizeof(char), my_asm.cpu.pc + 1, stream);
+        fwrite (my_asm.cpu.cmd, sizeof(char), (size_t) my_asm.cpu.pc + 1ul, stream);
         fprintf(stderr, TERMINAL_GREEN "compile success\n" TERMINAL_CANCEL);
 
         translator_dtor(&my_asm);
@@ -95,7 +95,7 @@ bool do_assembler(source *const code, translator *const my_asm, const int asm_nu
         {
             case INSTRUCTION: cur_no_err = translate_instruction(my_asm, &token_cnt, asm_num);
                               break;
-
+            case DBL_NUM    :
             case INT_NUM    : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "number can't be the instruction or label\n", lexis_data[token_cnt++].token_line);
                               cur_no_err = false;
                               break;
@@ -210,13 +210,13 @@ bool translate_push(translator *const my_asm, int *const token_cnt)
     *token_cnt += 1;
     check_inside
 
-    if (cur_token.type == KEY_CHAR && cur_token.value.key == '[')
+    if (cur_token.type == KEY_CHAR && cur_token.value.key == '[') // push из RAM
     {
         *token_cnt += 1;
         check_inside
         return translate_ram(my_asm, token_cnt, cmd);
     }
-    return translate_parametres(my_asm, cmd, token_cnt);
+    return translate_reg_dbl(my_asm, cmd, token_cnt); // push суммы действительного числа и регистра
 }
 
 bool translate_pop(translator *const my_asm, int *const token_cnt)
@@ -228,23 +228,23 @@ bool translate_pop(translator *const my_asm, int *const token_cnt)
     *token_cnt += 1;
     check_inside
 
-    if (cur_token.type == REG_NAME)
+    if (cur_token.type == REG_NAME) // pop в регистер
     {
         cmd = cmd | (1 << PARAM_REG);
-        executer_add_parametres(my_asm, cmd, cur_token.value.reg_num, 0);
+        executer_add_reg_int(my_asm, cmd, cur_token.value.reg_num, 0);
 
         *token_cnt += 1;
         return true;
     }
 
-    if (cur_token.type == KEY_CHAR && cur_token.value.key == '[')
+    if (cur_token.type == KEY_CHAR && cur_token.value.key == '[') // pop в RAM
     {
         *token_cnt += 1;
         check_inside
         return translate_ram(my_asm, token_cnt, cmd);
     }
 
-    if (cur_token.type == UNDEF_TOKEN)
+    if (cur_token.type == UNDEF_TOKEN) // pop в никуда
     {
         if (cur_token.value.token_len == 5 &&                // "void": 4 characters + 1 null-character
             !strncasecmp(my_asm->buff_data+cur_token.token_beg, "void", 4))
@@ -277,6 +277,7 @@ bool translate_jump_call(translator *const my_asm, int *const token_cnt, const i
         case REG_NAME   : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "register can't be the name of label\n", cur_token.token_line);
                           *token_cnt += 1;
                           return false;
+        case DBL_NUM    :
         case INT_NUM    : fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "number can't be the name of label\n", cur_token.token_line);
                           *token_cnt += 1;
                           return false;
@@ -311,7 +312,7 @@ bool translate_ram(translator *const my_asm, int *const token_cnt, unsigned char
     assert(token_cnt != nullptr);
 
     cmd = cmd | (1 << PARAM_MEM);
-    bool right_param = translate_parametres(my_asm, cmd, token_cnt);
+    bool right_param = translate_reg_int(my_asm, cmd, token_cnt); //индексом в RAM может быть сумма целого числа и целочисленного регистра
 
     if (cur_token.type == KEY_CHAR && cur_token.value.key == ']')
     {
@@ -337,8 +338,8 @@ bool translate_ram(translator *const my_asm, int *const token_cnt, unsigned char
 *   @note Значение по адресу token_cnt увеличивается после обработки очередного токена.
 */
 
-unsigned char translate_expretion(translator *const my_asm, int *const token_cnt, REGISTER *const reg_arg,
-                                                                                  int      *const int_arg)
+unsigned char translate_reg_int_expretion(translator *const my_asm, int *const token_cnt, REGISTER *const reg_arg,
+                                                                                          int      *const int_arg)
 {
     assert(my_asm    != nullptr);
     assert(token_cnt != nullptr);
@@ -399,7 +400,7 @@ bool translate_reg_plus_int(translator *const my_asm, int *const token_cnt, REGI
 
             if (cur_token.type == INT_NUM)
             {
-                *cmd_param  = (*cmd_param) | (1 << PARAM_INT);
+                *cmd_param  = (*cmd_param) | (1 << PARAM_NUM);
                 *int_arg    = cur_token.value.int_num;
                 *token_cnt += 1;
 
@@ -416,7 +417,7 @@ bool translate_reg_plus_int(translator *const my_asm, int *const token_cnt, REGI
 }
 
 /**
-*   @brief Аналог translate_reg_plus_int().
+*   @brief Аналогично translate_reg_plus_int().
 */
 
 bool translate_int_plus_reg(translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
@@ -431,8 +432,121 @@ bool translate_int_plus_reg(translator *const my_asm, int *const token_cnt, REGI
 
     if (cur_token.type == INT_NUM)
     {
-        *cmd_param  = (*cmd_param) | (1 << PARAM_INT);
+        *cmd_param  = (*cmd_param) | (1 << PARAM_NUM);
         *int_arg    = cur_token.value.int_num;
+        *token_cnt += 1;
+        check_inside
+
+        if (cur_token.type == KEY_CHAR && cur_token.value.key == '+')
+        {
+            *token_cnt += 1;
+            check_inside
+
+            if (cur_token.type == REG_NAME)
+            {
+                *cmd_param  = (*cmd_param) | (1 << PARAM_REG);
+                *reg_arg    = cur_token.value.reg_num;
+                *token_cnt += 1;
+
+                return true;
+            }
+            fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "invalid reg-arg\n", cur_token.token_line);
+            *token_cnt += 1;
+            return false;
+        }
+        return true;
+    }
+    return true;
+}
+
+/**
+*   @brief Аналогично translate_reg_int_expretion(), только разрешен ещё и double, в случае int, приведение к double
+*/
+unsigned char translate_reg_dbl_expretion(translator *const my_asm, int *const token_cnt, REGISTER *const reg_arg,
+                                                                                          double   *const dbl_arg)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+    assert(reg_arg   != nullptr);
+    assert(dbl_arg   != nullptr);
+
+    unsigned char cmd_param = 0;
+
+    if (!translate_reg_plus_dbl(my_asm, token_cnt, reg_arg, dbl_arg, &cmd_param)) return cmd_param = 0; //ошибка
+    if (cmd_param)                                                                return cmd_param;     //выражение правильного вида
+    
+    if (!translate_dbl_plus_reg(my_asm, token_cnt, reg_arg, dbl_arg, &cmd_param)) return cmd_param = 0;
+    if (!cmd_param)
+    {
+        fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "invalid expretion\n", cur_token.token_line);
+        *token_cnt += 1;
+    }
+    return cmd_param;
+}
+
+bool translate_reg_plus_dbl(translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
+                                                                            double        *const dbl_arg,
+                                                                            unsigned char *const cmd_param)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+    assert(reg_arg   != nullptr);
+    assert(dbl_arg   != nullptr);
+    assert(cmd_param != nullptr);
+
+    if (cur_token.type == REG_NAME)
+    {
+        *cmd_param  = (*cmd_param) | (1 << PARAM_REG);
+        *reg_arg    = cur_token.value.reg_num;
+        *token_cnt += 1;
+        check_inside
+
+        if (cur_token.type == KEY_CHAR && cur_token.value.key == '+')
+        {
+            *token_cnt += 1;
+            check_inside
+
+            if (cur_token.type == DBL_NUM)
+            {
+                *cmd_param  = (*cmd_param) | (1 << PARAM_NUM);
+                *dbl_arg    = cur_token.value.dbl_num;
+                *token_cnt += 1;
+
+                return true;
+            }
+            if (cur_token.type == INT_NUM)
+            {
+                *cmd_param  = (*cmd_param) | (1 << PARAM_NUM);
+                *dbl_arg    = cur_token.value.int_num;
+                *token_cnt += 1;
+            }
+
+            fprintf(stderr, "line %-5d" TERMINAL_RED " ERROR: " TERMINAL_CANCEL "invalid dbl-arg\n", cur_token.token_line);
+            *token_cnt += 1;
+            return false;
+        }
+        return true;
+    }
+    return true;
+}
+
+bool translate_dbl_plus_reg(translator *const my_asm, int *const token_cnt, REGISTER      *const reg_arg,
+                                                                            double        *const dbl_arg,
+                                                                            unsigned char *const cmd_param)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+    assert(reg_arg   != nullptr);
+    assert(dbl_arg   != nullptr);
+    assert(cmd_param != nullptr);
+
+    if (cur_token.type == DBL_NUM || cur_token.type == INT_NUM)
+    {
+        *cmd_param  = (*cmd_param) | (1 << PARAM_NUM);
+        
+        if (cur_token.type == DBL_NUM) *dbl_arg = cur_token.value.dbl_num;
+        else                           *dbl_arg = cur_token.value.int_num;
+
         *token_cnt += 1;
         check_inside
 
@@ -487,7 +601,7 @@ bool translate_undef_token(translator *const my_asm, int *const token_cnt)
     return false;
 }
 
-bool translate_parametres(translator *const my_asm, unsigned char cmd, int *const token_cnt)
+bool translate_reg_int(translator *const my_asm, unsigned char cmd, int *const token_cnt)
 {
     assert(my_asm    != nullptr);
     assert(token_cnt != nullptr);
@@ -495,23 +609,47 @@ bool translate_parametres(translator *const my_asm, unsigned char cmd, int *cons
     REGISTER reg_arg = ERR_REG;
     int      int_arg = 0;
 
-    unsigned char cmd_param = translate_expretion(my_asm, token_cnt, &reg_arg, &int_arg);
+    unsigned char cmd_param = translate_reg_int_expretion(my_asm, token_cnt, &reg_arg, &int_arg);
     cmd = cmd  |  cmd_param;
 
-    executer_add_parametres(my_asm, cmd, reg_arg, int_arg);
+    executer_add_reg_int(my_asm, cmd, reg_arg, int_arg);
     return cmd_param != 0;
 }
 
-void executer_add_parametres(translator *const my_asm, const unsigned char cmd, const REGISTER reg_arg, const int int_arg)
+bool translate_reg_dbl(translator *const my_asm, unsigned char cmd, int *const token_cnt)
+{
+    assert(my_asm    != nullptr);
+    assert(token_cnt != nullptr);
+
+    REGISTER reg_arg = ERR_REG;
+    double   dbl_arg = 0;
+
+    unsigned char cmd_param = translate_reg_dbl_expretion(my_asm, token_cnt, &reg_arg, &dbl_arg);
+    cmd = cmd  |  cmd_param;
+
+    executer_add_reg_dbl(my_asm, cmd, reg_arg, dbl_arg);
+    return cmd_param != 0;
+}
+
+void executer_add_reg_int(translator *const my_asm, const unsigned char cmd, const REGISTER reg_arg, const int int_arg)
 {
     assert(my_asm != nullptr);
 
     executer_add_cmd(&my_asm->cpu, &cmd, sizeof(unsigned char));
         
     if (cmd & (1 << PARAM_REG)) executer_add_cmd(&my_asm->cpu, &reg_arg, sizeof(REGISTER));
-    if (cmd & (1 << PARAM_INT)) executer_add_cmd(&my_asm->cpu, &int_arg, sizeof(int));
+    if (cmd & (1 << PARAM_NUM)) executer_add_cmd(&my_asm->cpu, &int_arg, sizeof(int));
 }
 
+void executer_add_reg_dbl(translator *const my_asm, const unsigned char cmd, const REGISTER reg_arg, const double dbl_arg)
+{
+    assert(my_asm != nullptr);
+
+    executer_add_cmd(&my_asm->cpu, &cmd, sizeof(unsigned char));
+
+    if (cmd & (1 << PARAM_REG)) executer_add_cmd(&my_asm->cpu, &reg_arg, sizeof(REGISTER));
+    if (cmd & (1 << PARAM_NUM)) executer_add_cmd(&my_asm->cpu, &dbl_arg, sizeof(double));
+}
 #undef cur_token
 #undef still_inside
 #undef check_inside
@@ -552,7 +690,7 @@ bool still_inside_lexis_data(const translator *const my_asm, int *const token_cn
     return *token_cnt < my_asm->lexis_pos;
 }
 
-int get_undef_token_num(const source *const code)
+int get_undef_token_num(const source *const code)   //для подсчета количества потанциальных меток
 {
     assert(code != nullptr);
 
@@ -683,6 +821,7 @@ void lexical_analyzer(source *const code)
 
             if      (get_reg_name(lexis_cur_token, token_len) != ERR_REG) create_reg_token(code, token_beg, token_len);
             else if (get_int_num (lexis_cur_token           ))            create_int_token(code, token_beg);
+            else if (get_dbl_num (lexis_cur_token           ))            create_dbl_token(code, token_beg);
             else
             {
                 ASM_CMD cur_instruction = get_asm_cmd(lexis_cur_token);
@@ -691,7 +830,6 @@ void lexical_analyzer(source *const code)
                 else                                  create_instruction_token(code, token_beg, cur_instruction);
             }
         }
-
         skip_source_spaces(code);
     }
 }
@@ -724,17 +862,32 @@ int get_another_token(source *const code)
     return reg = ERR_REG;
 }
 
-bool get_int_num(const char *cur_token, int *const ret) //ret = nullptr
+                                        // default ret = nullptr
+bool get_int_num(const char *cur_token, int *const ret)
 {
     assert(cur_token != nullptr);
 
     int int_num = 0;
     int num_len = 0;
 
-    if (sscanf(cur_token, "%d%n", &int_num, &num_len) <= 0) return false;
+    if (sscanf(cur_token, "%d%n", &int_num, &num_len) != 1) return false;
     if (cur_token[num_len] != '\0')                         return false;
 
     if (ret != nullptr) *ret = int_num;
+    return true;
+}
+                                            //default ret = nullptr
+bool get_dbl_num(const char *cur_token, double *const ret)
+{
+    assert(cur_token != nullptr);
+
+    double dbl_num = 0;
+    int    num_len = 0;
+
+    if (sscanf(cur_token, "%lf%n", &dbl_num, &num_len) != 1) return false;
+    if (cur_token[num_len] != '\0')                          return false;
+
+    if (ret != nullptr) *ret = dbl_num;
     return true;
 }
 
@@ -831,6 +984,18 @@ void create_int_token(source *const code, const int token_beg)
     lexis_data[lexis_pos].token_line = buff_line;
 
     get_int_num(lexis_cur_token, &lexis_data[lexis_pos].value.int_num);
+    lexis_pos++;
+}
+
+void create_dbl_token(source *const code, const int token_beg)
+{
+    assert(code      != nullptr);
+
+    lexis_data[lexis_pos].type       = DBL_NUM;
+    lexis_data[lexis_pos].token_beg  = token_beg;
+    lexis_data[lexis_pos].token_line = buff_line;
+
+    get_dbl_num(lexis_cur_token, &lexis_data[lexis_pos].value.dbl_num);
     lexis_pos++;
 }
 
@@ -1019,6 +1184,7 @@ void graphviz_dump_token(const source *const code, FILE *const stream, const int
         case REG_NAME   :     color =  DARK_GREEN;
                           fillcolor = LIGHT_GREEN;
                           break;
+        case DBL_NUM    :
         case INT_NUM    :     color =  DARK_ORANGE;
                           fillcolor = LIGHT_ORANGE;
                           break;
@@ -1068,6 +1234,8 @@ void get_token_dump_message(const token *const cur_token, char *const token_mess
         case REG_NAME   : sprintf(token_message, "value.reg_num=%s"     , REGISTER_NAMES[cur_token->value.reg_num]);
                           break;
         case INT_NUM    : sprintf(token_message, "value.int_num=%d"     , cur_token->value.int_num);
+                          break;
+        case DBL_NUM    : sprintf(token_message, "value.dbl_num=%f"     , cur_token->value.dbl_num);
                           break;
         case KEY_CHAR   : sprintf(token_message, "value.key=\'%c\'"     , cur_token->value.key);
                           break;

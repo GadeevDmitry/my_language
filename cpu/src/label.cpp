@@ -34,7 +34,7 @@ bool label_store_ctor(label_store *const link, const int capacity)
     link->capacity = capacity;
     link->size     = 0;
     
-    if (link->store == nullptr)
+    if (link->store == nullptr && capacity != 0)
     {
         log_error(        "can't allocate memory for label array(%d)\n", __LINE__);
         fprintf  (stderr, "can't allocate memory for label array\n");

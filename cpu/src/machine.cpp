@@ -8,7 +8,6 @@
 #include "../../lib/logs/log.h"
 #include "../../lib/read_write/read_write.h"
 #include "../../lib/algorithm/algorithm.h"
-#include "../../lib/graphviz_dump/graphviz_dump.h"
 
 #include "terminal_colors.h"
 #include "machine.h"
@@ -80,7 +79,7 @@ bool execute(machine *const computer)
 #define check_reg_arg(reg_arg, instruction_name)                                                                            \
   if (reg_arg <= 0 || reg_arg > REG_NUMBER)                                                                                 \
   {                                                                                                                         \
-      fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "invalid register\n", #instruction_name);     \
+      fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "invalid register\n", #instruction_name);      \
       return false;                                                                                                         \
   }
 
@@ -88,31 +87,31 @@ bool execute(machine *const computer)
 #define check_ram_index(ram_index, instruction_name)                                                                        \
   if (ram_index <  0 || ram_index >= RAM_SIZE)                                                                              \
   {                                                                                                                         \
-      fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "invalid ram index\n", #instruction_name);    \
+      fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "invalid ram index\n", #instruction_name);     \
       return false;                                                                                                         \
   }
 
 // checks if stack #stack_name is empty
 #define check_empty(stack_name, instruction_name)                                                                           \
-  if (stack_empty(&$##stack_name))                                                                                            \
+  if (stack_empty(&$##stack_name))                                                                                          \
   {                                                                                                                         \
       fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL #stack_name " is empty\n", #instruction_name); \
       return false;                                                                                                         \
   }
 
-// check if #pc pointed out of execute boundary
+// checks if #pc pointed out of execute boundary
 #define check_pc_inside(pc)                                                                                                 \
     if ((size_t) pc < 0 || (size_t) pc >= (size_t) $cpu.capacity)                                                           \
     {                                                                                                                       \
-        fprintf(stderr, TERMINAL_RED "RUNTIME ERROR: " TERMINAL_CANCEL "label pointed out of execute boundary\n");       \
+        fprintf(stderr, TERMINAL_RED "RUNTIME ERROR: " TERMINAL_CANCEL "label pointed out of execute boundary\n");          \
         return false;                                                                                                       \
     }
 
-// check if pc will go out of boundary after pulling cmd with size #pull_size
+// checks if pc will go out of boundary after pulling cmd with size #pull_size
 #define check_inside(pull_size)                                                                                             \
     if ((size_t) $cpu.pc + pull_size > (size_t) $cpu.capacity)                                                              \
     {                                                                                                                       \
-        fprintf(stderr, TERMINAL_RED "RUNTIME ERROR: " TERMINAL_CANCEL "no parameter at the end of file\n");             \
+        fprintf(stderr, TERMINAL_RED "RUNTIME ERROR: " TERMINAL_CANCEL "no parameter at the end of file\n");                \
         return false;                                                                                                       \
     }
 
@@ -138,24 +137,36 @@ bool execute_push(machine *const computer, const unsigned char cmd)
 
     bool     mem_arg = false;
     REGISTER reg_arg = ERR_REG;
-    cpu_type cpu_arg = 0;
+    double   dbl_arg = 0;
+    int      int_arg = 0;
 
-    if (!executer_pull_parameteres(computer, cmd, &mem_arg, &reg_arg, &cpu_arg)) return false;
+    if (cmd & (1 << PARAM_MEM))
+    {
+        if  (!executer_pull_reg_int(computer, cmd, &mem_arg, &reg_arg, &int_arg)) return false;
+    }
+    else if (!executer_pull_reg_dbl(computer, cmd, &mem_arg, &reg_arg, &dbl_arg)) return false;
 
-    int num_param = 0;
+    int    int_param = 0;
+    double dbl_param = 0;
+    if (mem_arg)
+    {
+        if (cmd & (1 << PARAM_NUM)) int_param += int_arg;
+        if (cmd & (1 << PARAM_REG))
+        {
+            check_reg_arg(reg_arg, PUSH);
+            int_param += $reg[reg_arg];
+        }
+        check_ram_index(int_param, PUSH);
+        stack_push(&$data_stack, &$ram[int_param]);
+        return true;
+    }
+    if (cmd & (1 << PARAM_NUM)) dbl_param += dbl_arg;
     if (cmd & (1 << PARAM_REG))
     {
         check_reg_arg(reg_arg, PUSH);
-        num_param += $reg[reg_arg];
+        dbl_param += $reg[reg_arg];
     }
-    if (cmd & (1 << PARAM_INT)) num_param += cpu_arg;
-    if (cmd & (1 << PARAM_MEM))
-    {
-        check_ram_index(num_param, PUSH);
-        stack_push(&$data_stack, &$ram[num_param]);
-        return true;
-    }
-    stack_push(&$data_stack, &num_param);
+    stack_push(&$data_stack, &dbl_param);
     return true;
 }
 
@@ -167,14 +178,14 @@ bool execute_pop(machine *const computer, const unsigned char cmd)
 
     bool     mem_arg = false;
     REGISTER reg_arg = ERR_REG;
-    cpu_type cpu_arg = 0;
+    int      cpu_arg = 0;
 
-    if (!(cmd & (1 << PARAM_MEM)) && (cmd & (1 << PARAM_INT)))
+    if (!(cmd & (1 << PARAM_MEM)) && (cmd & (1 << PARAM_NUM)))
     {
-        fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "lvalue as a pop-argument\n", "POP");
+        fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "rvalue as a pop-argument\n", "POP");
         return false;
     }
-    if (!executer_pull_parameteres(computer, cmd, &mem_arg, &reg_arg, &cpu_arg)) return false;
+    if (!executer_pull_reg_int(computer, cmd, &mem_arg, &reg_arg, &cpu_arg)) return false;
 
     int num_param = 0;
     if (cmd & (1 << PARAM_MEM))
@@ -184,7 +195,7 @@ bool execute_pop(machine *const computer, const unsigned char cmd)
             check_reg_arg(reg_arg, POP);
             num_param += $reg[reg_arg];
         }
-        if (cmd & (1 << PARAM_INT)) num_param += cpu_arg;
+        if (cmd & (1 << PARAM_NUM)) num_param += cpu_arg;
 
         check_ram_index(num_param, POP);
         $ram[num_param] = *(cpu_type *) stack_pop(&$data_stack);
@@ -193,16 +204,16 @@ bool execute_pop(machine *const computer, const unsigned char cmd)
     if (cmd & (1 << PARAM_REG))
     {
         check_reg_arg(reg_arg, POP);
-        $reg[reg_arg] = *(cpu_type *) stack_pop(&$data_stack);
-        return true;
+        $reg[reg_arg] = (int) *(cpu_type *) stack_pop(&$data_stack); // кладём действительное число в целочисленный регистр
+        return true;                                                 // (при генерации ассемблерного кода не используется)
     }
     stack_pop(&$data_stack);
     return true;
 }
 
-bool executer_pull_parameteres(machine *const computer, const unsigned char cmd, bool     *const mem_arg,
-                                                                                 REGISTER *const reg_arg,
-                                                                                 cpu_type *const cpu_arg)
+bool executer_pull_reg_int(machine *const computer, const unsigned char cmd, bool     *const mem_arg,
+                                                                             REGISTER *const reg_arg,
+                                                                             int      *const cpu_arg)
 {
     assert(computer != nullptr);
     assert(mem_arg  != nullptr);
@@ -212,7 +223,7 @@ bool executer_pull_parameteres(machine *const computer, const unsigned char cmd,
     *mem_arg = cmd & (1 << PARAM_MEM);
 
     bool is_reg_arg = cmd & (1 << PARAM_REG);
-    bool is_cpu_arg = cmd & (1 << PARAM_INT);
+    bool is_cpu_arg = cmd & (1 << PARAM_NUM);
     
     if (is_reg_arg)
     {
@@ -222,7 +233,34 @@ bool executer_pull_parameteres(machine *const computer, const unsigned char cmd,
     if (is_cpu_arg)
     {
         check_inside(sizeof(cpu_type));
-        executer_pull_cmd(&$cpu, cpu_arg, sizeof(cpu_type));
+        executer_pull_cmd(&$cpu, cpu_arg, sizeof(int));
+    }
+    return true;
+}
+
+bool executer_pull_reg_dbl(machine *const computer, const unsigned char cmd, bool     *const mem_arg,
+                                                                             REGISTER *const reg_arg,
+                                                                             double   *const cpu_arg)
+{
+    assert(computer != nullptr);
+    assert(mem_arg  != nullptr);
+    assert(reg_arg  != nullptr);
+    assert(cpu_arg  != nullptr);
+
+    *mem_arg = cmd & (1 << PARAM_MEM);
+
+    bool is_reg_arg = cmd & (1 << PARAM_REG);
+    bool is_cpu_arg = cmd & (1 << PARAM_NUM);
+    
+    if (is_reg_arg)
+    {
+        check_inside(sizeof(REGISTER));
+        executer_pull_cmd(&$cpu, reg_arg, sizeof(REGISTER));
+    }
+    if (is_cpu_arg)
+    {
+        check_inside(sizeof(cpu_type));
+        executer_pull_cmd(&$cpu, cpu_arg, sizeof(double));
     }
     return true;
 }
@@ -265,12 +303,12 @@ bool execute_jump(machine *const computer, const unsigned char cmd)
 
     switch(cmd)
     {
-        case JA : if (num1 >  num2) { $cpu.pc = label_pc; } return true;
-        case JAE: if (num1 >= num2) { $cpu.pc = label_pc; } return true;
-        case JB : if (num1 <  num2) { $cpu.pc = label_pc; } return true;
-        case JBE: if (num1 <= num2) { $cpu.pc = label_pc; } return true;
-        case JE : if (num1 == num2) { $cpu.pc = label_pc; } return true;
-        case JNE: if (num1 != num2) { $cpu.pc = label_pc; } return true;
+        case JA : if (num1 > num2)                             { $cpu.pc = label_pc; } return true;
+        case JAE: if (num1 > num2 || approx_equal(num1, num2)) { $cpu.pc = label_pc; } return true;
+        case JB : if (num1 < num2)                             { $cpu.pc = label_pc; } return true;
+        case JBE: if (num1 < num2 || approx_equal(num1, num2)) { $cpu.pc = label_pc; } return true;
+        case JE : if (               approx_equal(num1, num2)) { $cpu.pc = label_pc; } return true;
+        case JNE: if (              !approx_equal(num1, num2)) { $cpu.pc = label_pc; } return true;
 
         default : log_error(         "default case in execute_jump: cmd=%d(%d)\n", cmd, __LINE__);
                   assert   (false && "default vase in execute_jump");
@@ -293,10 +331,10 @@ bool execute_in(machine *const computer)
 {
     assert(computer != nullptr);
 
-    int num = 0;
-    if (scanf("%d", &num) != 1)
+    cpu_type num = 0;
+    if (scanf("%lg", &num) != 1)
     {
-        fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "input value is not int\n", "IN");
+        fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "input value is not double\n", "IN");
         return false;
     }
 
@@ -310,8 +348,8 @@ bool execute_out(machine *const computer)
 
     check_empty(data_stack, OUT);
 
-    int num = *(int *) stack_front(&$data_stack);
-    fprintf(stderr, "%d\n", num);
+    cpu_type num = *(cpu_type *) stack_front(&$data_stack);
+    fprintf(stderr, "%lg\n", num);
     return true;
 }
 
@@ -392,7 +430,7 @@ bool execute_div(machine *const computer)
     check_empty(data_stack, DIV);
     num1 = *(cpu_type *) stack_pop(&$data_stack);
 
-    if (num2 == 0)
+    if (approx_equal(num2, 0))
     {
         fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "division by zero\n", "DIV");
         return false;
@@ -416,13 +454,17 @@ bool execute_pow(machine *const computer)
     check_empty(data_stack, POW);
     num1 = *(cpu_type *) stack_pop(&$data_stack);
 
-    if (num1 == 0 && num2 < 0)
+    if (approx_equal(num1, 0) && num2 < 0)
     {
         fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "division by zero\n", "POW");
         return false;
     }
-
-    num1 = (int) pow((double) num1, (double) num2);
+    if (num1 < 0)
+    {
+        fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "pow of less zero basis\n", "POW");
+        return false;
+    }
+    num1 = pow(num1, num2);
     stack_push(&$data_stack, &num1);
     return true;
 }
