@@ -258,26 +258,50 @@ bool translate_operator(const AST_node *const node, FILE *const stream, const na
     assert(node       != nullptr);
     assert($type      == OPERATOR);
 
-    if ($op_type == OP_INPUT || $op_type == OP_OUTPUT)
+    switch ($op_type)
     {
-        if (!independent_op)
-        {
-            fprintf(stderr, "discoder translate: \"%s\" node is not independent operator\n", OPERATOR_NAMES[$op_type]);
-            return false;
-        }
-        fprintf_tab(stream, tab_shift);
-        fprintf    (stream, "%s ", AST_OPERATOR_TYPE_NAMES[$op_type]);
+        case OP_ADD        :
+        case OP_SUB        :
+        case OP_MUL        :
+        case OP_DIV        :
+        case OP_POW        :
 
-        if (!discoder_translate(L, stream, var_store, func_store, tab_shift, false)) return false;
-        if (!discoder_translate(R, stream, var_store, func_store, tab_shift, false)) return false;
+        case OP_EQUAL      :
+        case OP_ABOVE      :
+        case OP_BELOW      :
+        case OP_ABOVE_EQUAL:
+        case OP_BELOW_EQUAL:
+        case OP_NOT_EQUAL  :
 
-        fprintf(stream, ";\n");
-        return true;
+        case OP_OR         :
+        case OP_AND        : return translate_closed_binary_operator(node, stream, var_store, func_store, tab_shift, independent_op);
+
+        case OP_INPUT      :
+        case OP_OUTPUT     : return translate_opened_unary_operator (node, stream, var_store, func_store, tab_shift, independent_op);
+
+        case OP_NOT        :
+        case OP_SQRT       : return translate_closed_unary_operator (node, stream, var_store, func_store, tab_shift, independent_op);
+
+        case ASSIGNMENT    : return  translate_assignment           (node, stream, var_store, func_store, tab_shift, independent_op);
+
+        default            : break;
     }
 
-    if ($op_type == ASSIGNMENT)
-    {
-        if (independent_op) fprintf_tab(stream, tab_shift);
+    return false;
+}
+
+bool translate_assignment(const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                          const name_list *const func_store, const int  tab_shift,
+                                                                                                             const bool independent_op)
+{
+    assert(stream     != nullptr);
+    assert(var_store  != nullptr);
+    assert(func_store != nullptr);
+    assert(node       != nullptr);
+    assert($type      == OPERATOR);
+    assert($op_type   == ASSIGNMENT);
+
+    if (independent_op) fprintf_tab(stream, tab_shift);
 
         if (!discoder_translate(L, stream, var_store, func_store, tab_shift, false)) return false;
         fprintf(stream, " = ");
@@ -286,22 +310,76 @@ bool translate_operator(const AST_node *const node, FILE *const stream, const na
         if (independent_op) fprintf(stream, ";\n");
 
         return true;
+}
+
+bool translate_opened_unary_operator(const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                     const name_list *const func_store, const int  tab_shift,
+                                                                                                                        const bool independent_op)
+{
+    assert(stream     != nullptr);
+    assert(var_store  != nullptr);
+    assert(func_store != nullptr);
+    assert(node       != nullptr);
+    assert($type      == OPERATOR);
+
+    if (!independent_op)
+    {
+        fprintf(stderr, "discoder translate: \"%s\" must be independent operator\n", AST_OPERATOR_TYPE_NAMES[$op_type]);
+        return false;
     }
+    fprintf_tab(stream, tab_shift);
+    fprintf    (stream, "%s ", AST_OPERATOR_TYPE_NAMES[$op_type]);
+
+    if (!discoder_translate(L, stream, var_store, func_store, tab_shift, false)) return false;
+    if (!discoder_translate(R, stream, var_store, func_store, tab_shift, false)) return false;
+
+    fprintf(stream, ";\n");
+    return true;
+}
+
+bool translate_closed_unary_operator(const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                     const name_list *const func_store, const int  tab_shift,
+                                                                                                                        const bool independent_op)
+{
+    assert(stream     != nullptr);
+    assert(var_store  != nullptr);
+    assert(func_store != nullptr);
+    assert(node       != nullptr);
+    assert($type      == OPERATOR);
 
     if (independent_op)
     {
-        fprintf(stderr, "discoder translate: \"%s\" is independent operator\n", OPERATOR_NAMES[$op_type]);
+        fprintf(stderr, "discoder translate: \"%s\" can't be independent operator\n", AST_OPERATOR_TYPE_NAMES[$op_type]);
         return false;
     }
-    if ($op_type == OP_NOT)
+    fprintf(stream, "%s", AST_OPERATOR_TYPE_NAMES[$op_type]);
+
+    if ($op_type == OP_SQRT) fprintf(stream, "(");
+
+    if (!discoder_translate(L, stream, var_store, func_store, tab_shift, false)) return false;
+    if (!discoder_translate(R, stream, var_store, func_store, tab_shift, false)) return false;
+
+    if ($op_type == OP_SQRT) fprintf(stream, ")");
+
+    return true;
+}
+
+bool translate_closed_binary_operator(const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                      const name_list *const func_store, const int tab_shift,
+                                                                                                                         const bool independent_op)
+{
+    assert(stream     != nullptr);
+    assert(var_store  != nullptr);
+    assert(func_store != nullptr);
+    assert(node       != nullptr);
+    assert($type      == OPERATOR);
+
+    if (independent_op)
     {
-        fprintf(stream, "!");
-
-        if (!discoder_translate(L, stream, var_store, func_store, tab_shift, false)) return false;
-        if (!discoder_translate(R, stream, var_store, func_store, tab_shift, false)) return false;
-
-        return true;
+        fprintf(stderr, "discoder translate: \"%s\" can't be independent operator\n", AST_OPERATOR_TYPE_NAMES[$op_type]);
+        return false;
     }
+
     if (L != nullptr && L->type == OPERATOR && OP_PRIORITY[L->value.op_type] < OP_PRIORITY[$op_type])
     {
         fprintf(stream, "(");
@@ -321,8 +399,8 @@ bool translate_operator(const AST_node *const node, FILE *const stream, const na
     else if (!discoder_translate(R, stream, var_store, func_store, tab_shift, false)) return false;
 
     return true;
-}
 
+}
 bool translate_var_decl(const AST_node *const node, FILE *const stream, const name_list *const var_store,
                                                                         const name_list *const func_store, const int  tab_shift,
                                                                                                            const bool independent_op)

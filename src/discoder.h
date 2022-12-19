@@ -31,6 +31,7 @@ static const char *AST_OPERATOR_TYPE_NAMES[] =
     "GOAL_PLUS_ASSIST"  , // OP_AND
 
     "="                 , // ASSIGNMENT
+    "KEEPER"            , // OP_SQRT
 };
 
 static const int OP_PRIORITY[] =
@@ -57,6 +58,7 @@ static const int OP_PRIORITY[] =
     2   ,   // OP_AND
 
     0   ,   // ASSIGNMENT
+    9   ,   // OP_SQRT
 };
 
 //===========================================================================================================================
@@ -98,10 +100,24 @@ bool translate_if               (const AST_node *const node, FILE *const stream,
                                                                                                                     const bool independent_op);
 bool translate_while            (const AST_node *const node, FILE *const stream, const name_list *const var_store,
                                                                                  const name_list *const func_store, const int  tab_shift,
-                                                                                                                    const bool independent_op);
-bool translate_operator         (const AST_node *const node, FILE *const stream, const name_list *const var_store,
-                                                                                 const name_list *const func_store, const int  tab_shift,
-                                                                                                                    const bool independent_op);
+                                                                                                                   const bool independent_op);
+//--------------------------------------------------------------------------------------------------------------------------
+bool translate_operator               (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                       const name_list *const func_store, const int  tab_shift,
+                                                                                                                          const bool independent_op);
+bool translate_assignment             (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                       const name_list *const func_store, const int  tab_shift,
+                                                                                                                          const bool independent_op);
+bool translate_opened_unary_operator  (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                       const name_list *const func_store, const int  tab_shift,
+                                                                                                                          const bool independent_op);
+bool translate_closed_unary_operator  (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                       const name_list *const func_store, const int  tab_shift,
+                                                                                                                          const bool independent_op);
+bool translate_closed_binary_operator (const AST_node *const node, FILE *const stream, const name_list *const var_store,
+                                                                                       const name_list *const func_store, const int tab_shift,
+                                                                                                                          const bool independent_op);
+//--------------------------------------------------------------------------------------------------------------------------
 bool translate_var_decl         (const AST_node *const node, FILE *const stream, const name_list *const var_store,
                                                                                  const name_list *const func_store, const int  tab_shift,
                                                                                                                     const bool independent_op);

@@ -388,6 +388,7 @@ bool translate_operator(translator *const ast_asm, const AST_node *const node, F
         case OP_INPUT       :
         case OP_OUTPUT      : return translate_opened_unary_operator (ast_asm, node, stream, independent_op);
 
+        case OP_SQRT        :
         case OP_NOT         : return translate_closed_unary_operator (ast_asm, node, stream, independent_op);
         
         case ASSIGNMENT     : return translate_assignment            (ast_asm, node, stream, independent_op);
@@ -568,7 +569,8 @@ bool translate_closed_unary_operator(translator *const ast_asm, const AST_node *
 
     switch ($op_type)
     {
-        case OP_NOT: fprintf(stream, "call def_operator_not\n"); break;
+        case OP_NOT : fprintf(stream, "call def_operator_not\n"); break;
+        case OP_SQRT: fprintf(stream, "sqrt\n");                  break;
         default    : assert(false && "default case in translate closed_unary_operator"); return false;
     }
 

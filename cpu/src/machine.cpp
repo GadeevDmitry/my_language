@@ -58,6 +58,7 @@ bool execute(machine *const computer)
             case MUL : if (execute_mul  (computer) == false) { machine_dtor(computer); return false; } break;
             case DIV : if (execute_div  (computer) == false) { machine_dtor(computer); return false; } break;
             case POW : if (execute_pow  (computer) == false) { machine_dtor(computer); return false; } break;
+            case SQRT: if (execute_sqrt (computer) == false) { machine_dtor(computer); return false; } break;
 
             case CALL: if (execute_call (computer) == false) { machine_dtor(computer); return false; } break;
             case JMP :
@@ -478,6 +479,25 @@ bool execute_pow(machine *const computer)
     }
     num1 = pow(num1, num2);
     stack_push(&$data_stack, &num1);
+    return true;
+}
+
+bool execute_sqrt(machine *const computer)
+{
+    assert(computer != nullptr);
+
+    cpu_type num = 0;
+
+    check_empty(data_stack, SQRT);
+    num = *(cpu_type *) stack_pop(&$data_stack);
+
+    if (num < 0)
+    {
+        fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "sqrt of less zero numer\n", "SQRT");
+        return false;
+    }
+    num = sqrt(num);
+    stack_push(&$data_stack, &num);
     return true;
 }
 

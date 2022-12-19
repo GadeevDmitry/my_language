@@ -69,6 +69,7 @@ bool execute_sub               (machine *const computer);
 bool execute_mul               (machine *const computer);
 bool execute_div               (machine *const computer);
 bool execute_pow               (machine *const computer);
+bool execute_sqrt              (machine *const computer);
 
 /*===========================================================================================================================*/
 // MACHINE_CTOR_DTOR

@@ -59,6 +59,7 @@ enum OPERATOR_TYPE
     OP_AND          ,
 
     ASSIGNMENT      ,
+    OP_SQRT         ,
 };
 
 static const char *OPERATOR_NAMES[] =
@@ -81,6 +82,7 @@ static const char *OPERATOR_NAMES[] =
     "or"            ,
     "and"           ,
     "assignment"    ,
+    "sqrt"          ,
 };
 
 static const char *MAIN_FUNCTION = "CAMP_NOU";

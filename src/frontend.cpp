@@ -126,6 +126,7 @@ int main(const int argc, const char *argv[])
     if     (code == nullptr) return 0;
 
     lexical_analyzer   (code);
+    lexis_graphviz_dump(code);
 
     dictionary name_store = {};
     dictionary_ctor(&name_store);
@@ -1658,7 +1659,7 @@ bool parse_op_not(dictionary *const name_store, const source *const code, int *c
 #undef not_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 #define operand_err_exit                                                                                                    \
-        log_error("error in parse_operand: old_token_cnt=%d\n", old_token_cnt);                                           \
+        log_error("error in parse_operand: old_token_cnt=%d\n", old_token_cnt);                                             \
         AST_tree_dtor(*operand);                                                                                            \
         *operand   = nullptr;                                                                                               \
         *token_cnt = old_token_cnt;                                                                                         \
@@ -1688,6 +1689,8 @@ bool parse_operand(dictionary *const name_store, const source *const code, int *
         *token_cnt += 1;
         return true;
     }
+    if (!parse_unary_op    (name_store, code, token_cnt, operand)) { operand_err_exit }
+    if (*operand != nullptr)                                         return true;
     if (!parse_rvalue_token(name_store, code, token_cnt, operand)) { operand_err_exit }
     if (*operand != nullptr)                                         return true;
     if (parse_func_call(name_store, code, token_cnt, operand) &&
@@ -1697,6 +1700,60 @@ bool parse_operand(dictionary *const name_store, const source *const code, int *
     operand_err_exit
 }
 #undef operand_err_exit
+//--------------------------------------------------------------------------------------------------------------------------
+bool parse_unary_op(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const unary_op)
+{
+    assert(name_store != nullptr);
+    assert(code       != nullptr);
+    assert(token_cnt  != nullptr);
+    assert(unary_op   != nullptr);
+    assert(*unary_op  == nullptr);
+
+    if (!parse_sqrt(name_store, code, token_cnt, unary_op)) { return false; }
+    return true;
+}
+//--------------------------------------------------------------------------------------------------------------------------
+#define sqrt_err_exit                                                                                                       \
+        AST_tree_dtor(*sqrt_op);                                                                                            \
+        *sqrt_op = nullptr;                                                                                                 \
+        *token_cnt = old_token_cnt;                                                                                         \
+        return false;
+
+bool parse_sqrt(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const sqrt_op)
+{
+    assert(name_store != nullptr);
+    assert(code       != nullptr);
+    assert(token_cnt  != nullptr);
+    assert(sqrt_op    != nullptr);
+    assert(*sqrt_op   == nullptr);
+
+    const int old_token_cnt = *token_cnt;
+
+    if (!token_sqrt($cur_token)) return true;
+
+    *token_cnt += 1;
+    if (!token_char($cur_token, '('))
+    {
+        fprintf_err($cur_token.token_line, "expected '(' before sqrt operand\n");
+        sqrt_err_exit
+    }
+    *token_cnt += 1;
+    AST_node *subtree = nullptr;
+
+    if (!parse_rvalue(name_store, code, token_cnt, &subtree)) { sqrt_err_exit }
+
+    *sqrt_op = new_OPERATOR_AST_node(OP_SQRT, subtree);
+    subtree  = nullptr;
+
+    if (!token_char($cur_token, ')'))
+    {
+        fprintf_err($cur_token.token_line, "expected ')' after sqrt operand\n");
+        sqrt_err_exit
+    }
+    *token_cnt += 1;
+    return true;
+}
+#undef sqrt_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 bool parse_rvalue_token(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const subtree)
 {
@@ -1762,6 +1819,7 @@ OPERATOR_TYPE token_to_ast_op_type(const token cur_token)
     if (token_be    (cur_token))      return OP_BELOW_EQUAL;
     if (token_input (cur_token))      return OP_INPUT;
     if (token_output(cur_token))      return OP_OUTPUT;
+    if (token_sqrt  (cur_token))      return OP_SQRT;
 
     assert(false && "default case in token_to_ast_op_type");
     return OP_ADD;
@@ -1785,6 +1843,7 @@ bool token_while  (const token cur_token) { return cur_token.type == KEY_WORD &&
 bool token_return (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == RETURN; }
 bool token_input  (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == INPUT ; }
 bool token_output (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == OUTPUT; }
+bool token_sqrt   (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == SQRT  ; }
 
 bool token_e      (const token cur_token) { return cur_token.type == KEY_CHAR_DOUBLE && cur_token.key_dbl_char_val == EQUAL      ; }
 bool token_ne     (const token cur_token) { return cur_token.type == KEY_CHAR_DOUBLE && cur_token.key_dbl_char_val == NOT_EQUAL  ; }
