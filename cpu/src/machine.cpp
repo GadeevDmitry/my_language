@@ -59,6 +59,7 @@ bool execute(machine *const computer)
             case DIV : if (execute_div  (computer) == false) { machine_dtor(computer); return false; } break;
             case POW : if (execute_pow  (computer) == false) { machine_dtor(computer); return false; } break;
             case SQRT: if (execute_sqrt (computer) == false) { machine_dtor(computer); return false; } break;
+            case SIN : if (execute_sin  (computer) == false) { machine_dtor(computer); return false; } break;
 
             case CALL: if (execute_call (computer) == false) { machine_dtor(computer); return false; } break;
             case JMP :
@@ -501,6 +502,19 @@ bool execute_sqrt(machine *const computer)
     return true;
 }
 
+bool execute_sin(machine *const computer)
+{
+    assert(computer != nullptr);
+
+    cpu_type num = 0;
+
+    check_empty(data_stack, SIN);
+    num = *(cpu_type *) stack_pop(&$data_stack);
+
+    num = sin(num);
+    stack_push(&$data_stack, &num);
+    return true;
+}
 /*===========================================================================================================================*/
 // MACHINE_CTOR_DTOR
 /*===========================================================================================================================*/

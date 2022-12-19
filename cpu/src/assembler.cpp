@@ -158,7 +158,8 @@ bool translate_instruction(translator *const my_asm, int *const token_cnt, const
         case MUL :
         case DIV :
         case POW :
-        case SQRT: return translate_no_parametres(my_asm, token_cnt);
+        case SQRT:
+        case SIN : return translate_no_parametres(my_asm, token_cnt);
         case PUSH: return translate_push         (my_asm, token_cnt);
         case POP : return translate_pop          (my_asm, token_cnt);
         case CALL:
@@ -921,6 +922,7 @@ ASM_CMD get_asm_cmd(const char *cur_token)
     if (!strcasecmp("div" , cur_token)) return DIV ;
     if (!strcasecmp("pow" , cur_token)) return POW ;
     if (!strcasecmp("sqrt", cur_token)) return SQRT;
+    if (!strcasecmp("sin" , cur_token)) return SIN ;
 
     return UNDEF_ASM_CMD;
 }

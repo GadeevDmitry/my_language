@@ -66,6 +66,7 @@ static const char *KEY_WORD_NAMES[]   =
     "CHECK_BEGIN"       ,   // input
     "CHECK_OVER"        ,   // output
     "KEEPER"            ,   // sqrt
+    "LEFT_CORNER"       ,   // sin
 };
 enum KEY_WORD_TYPE
 {
@@ -77,6 +78,7 @@ enum KEY_WORD_TYPE
     INPUT   ,
     OUTPUT  ,
     SQRT    ,
+    SIN     ,
 };
 
 static const char *KEY_CHAR_DOUBLE_NAMES[] = 
@@ -331,6 +333,7 @@ bool parse_op_not           (dictionary *const name_store, const source *const c
 bool parse_operand          (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          operand);
 bool parse_unary_op         (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         unary_op);
 bool parse_sqrt             (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          sqrt_op);
+bool parse_sin              (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const           sin_op);
 
 bool parse_rvalue_token     (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
 bool parse_lvalue           (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
@@ -355,6 +358,7 @@ bool token_return (const token cur_token);
 bool token_input  (const token cur_token);
 bool token_output (const token cur_token);
 bool token_sqrt   (const token cur_token);
+bool token_sin    (const token cur_token);
 
 bool token_e      (const token cur_token);
 bool token_ne     (const token cur_token);

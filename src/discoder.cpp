@@ -280,6 +280,7 @@ bool translate_operator(const AST_node *const node, FILE *const stream, const na
         case OP_OUTPUT     : return translate_opened_unary_operator (node, stream, var_store, func_store, tab_shift, independent_op);
 
         case OP_NOT        :
+        case OP_SIN        :
         case OP_SQRT       : return translate_closed_unary_operator (node, stream, var_store, func_store, tab_shift, independent_op);
 
         case ASSIGNMENT    : return  translate_assignment           (node, stream, var_store, func_store, tab_shift, independent_op);
@@ -354,12 +355,12 @@ bool translate_closed_unary_operator(const AST_node *const node, FILE *const str
     }
     fprintf(stream, "%s", AST_OPERATOR_TYPE_NAMES[$op_type]);
 
-    if ($op_type == OP_SQRT) fprintf(stream, "(");
+    if ($op_type != OP_NOT) fprintf(stream, "(");
 
     if (!discoder_translate(L, stream, var_store, func_store, tab_shift, false)) return false;
     if (!discoder_translate(R, stream, var_store, func_store, tab_shift, false)) return false;
 
-    if ($op_type == OP_SQRT) fprintf(stream, ")");
+    if ($op_type != OP_NOT) fprintf(stream, ")");
 
     return true;
 }

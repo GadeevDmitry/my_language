@@ -1710,6 +1710,7 @@ bool parse_unary_op(dictionary *const name_store, const source *const code, int 
     assert(*unary_op  == nullptr);
 
     if (!parse_sqrt(name_store, code, token_cnt, unary_op)) { return false; }
+    if (!parse_sin (name_store, code, token_cnt, unary_op)) { return false; }
     return true;
 }
 //--------------------------------------------------------------------------------------------------------------------------
@@ -1754,6 +1755,48 @@ bool parse_sqrt(dictionary *const name_store, const source *const code, int *con
     return true;
 }
 #undef sqrt_err_exit
+
+#define sin_err_exit                                                                                                        \
+        AST_tree_dtor(*sin_op);                                                                                             \
+        *sin_op = nullptr;                                                                                                  \
+        *token_cnt = old_token_cnt;                                                                                         \
+        return false;
+
+bool parse_sin(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const sin_op)
+{
+    assert(name_store != nullptr);
+    assert(code       != nullptr);
+    assert(token_cnt  != nullptr);
+    assert(sin_op     != nullptr);
+    assert(*sin_op    == nullptr);
+
+    const int old_token_cnt = *token_cnt;
+
+    if (!token_sin($cur_token)) return true;
+
+    *token_cnt += 1;
+    if (!token_char($cur_token, '('))
+    {
+        fprintf_err($cur_token.token_line, "expected '(' before sin operand\n");
+        sin_err_exit
+    }
+    *token_cnt += 1;
+    AST_node *subtree = nullptr;
+
+    if (!parse_rvalue(name_store, code, token_cnt, &subtree)) { sin_err_exit }
+
+    *sin_op = new_OPERATOR_AST_node(OP_SIN, subtree);
+    subtree = nullptr;
+
+    if (!token_char($cur_token, ')'))
+    {
+        fprintf_err($cur_token.token_line, "expected ')' after sin operand\n");
+        sin_err_exit
+    }
+    *token_cnt += 1;
+    return true;
+}
+#undef sin_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 bool parse_rvalue_token(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const subtree)
 {
@@ -1844,6 +1887,7 @@ bool token_return (const token cur_token) { return cur_token.type == KEY_WORD &&
 bool token_input  (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == INPUT ; }
 bool token_output (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == OUTPUT; }
 bool token_sqrt   (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == SQRT  ; }
+bool token_sin    (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == SIN   ; }
 
 bool token_e      (const token cur_token) { return cur_token.type == KEY_CHAR_DOUBLE && cur_token.key_dbl_char_val == EQUAL      ; }
 bool token_ne     (const token cur_token) { return cur_token.type == KEY_CHAR_DOUBLE && cur_token.key_dbl_char_val == NOT_EQUAL  ; }

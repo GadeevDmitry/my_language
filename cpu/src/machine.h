@@ -70,6 +70,7 @@ bool execute_mul               (machine *const computer);
 bool execute_div               (machine *const computer);
 bool execute_pow               (machine *const computer);
 bool execute_sqrt              (machine *const computer);
+bool execute_sin               (machine *const computer);
 
 /*===========================================================================================================================*/
 // MACHINE_CTOR_DTOR

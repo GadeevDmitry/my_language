@@ -52,8 +52,9 @@ enum ASM_CMD
     DIV             , // 17
     POW             , // 18
     SQRT            , // 19
+    SIN             , // 20
 
-    UNDEF_ASM_CMD   , // 20
+    UNDEF_ASM_CMD   , // 21
 };
 
 enum ASM_CMD_PARAM      //    |   1 bit   |   1 bit   |   1 bit   |         5 bit         |

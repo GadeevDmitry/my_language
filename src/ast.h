@@ -60,6 +60,7 @@ enum OPERATOR_TYPE
 
     ASSIGNMENT      ,
     OP_POW          ,
+    OP_SIN          ,
 };
 
 static const char *OPERATOR_NAMES[] =
@@ -83,6 +84,7 @@ static const char *OPERATOR_NAMES[] =
     "and"           ,
     "assignment"    ,
     "pow"           ,
+    "sin"           ,
 };
 
 static const char *MAIN_FUNCTION = "CAMP_NOU";
