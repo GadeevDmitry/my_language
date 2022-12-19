@@ -1709,8 +1709,10 @@ bool parse_unary_op(dictionary *const name_store, const source *const code, int 
     assert(unary_op   != nullptr);
     assert(*unary_op  == nullptr);
 
-    if (!parse_sqrt(name_store, code, token_cnt, unary_op)) { return false; }
-    if (!parse_sin (name_store, code, token_cnt, unary_op)) { return false; }
+    if (!parse_sqrt(name_store, code, token_cnt, unary_op)) return false;
+    if (*unary_op != nullptr)                               return  true;
+
+    if (!parse_sin (name_store, code, token_cnt, unary_op)) return false;
     return true;
 }
 //--------------------------------------------------------------------------------------------------------------------------
