@@ -1,0 +1,89 @@
+def_operator_or:    pop rbx                 #   | num1 |
+                    pop rcx                 #   +------+
+                                            #   | num2 |        | num1 || num2 |
+                    push rbx                #   +------+ =====> +--------------+
+                    push 0                  #   :      :        :              :
+                    jne zero_1              #   :      :        :              :
+
+                    push rcx
+                    push 0
+                    jne zero_1
+
+                    push 0
+                    ret
+
+                    zero_1: push 1
+                            ret
+
+def_operator_and:   pop rbx                 #   | num1 |
+                    pop rcx                 #   +------+
+                                            #   | num2 |        | num1 && num2 |
+                    push rbx                #   +------+ =====> +--------------+
+                    push 0                  #   :      :        :              :
+                    je zero_3               #   :      :        :              :
+
+                    push rcx
+                    push 0
+                    je zero_3
+
+                    push 1
+                    ret
+
+                    zero_3: push 0
+                            ret
+
+def_operator_eq:    je eq_1                 #   | num1 |
+                                            #   +------+
+                    push 0                  #   | num2 |        | num1 == num2 |
+                    ret                     #   +------+ =====> +--------------+
+                                            #   :      :        :              :
+                    eq_1:   push 1          #   :      :        :              :
+                            ret
+
+def_operator_neq:   je eq_2                 #   | num1 |
+                                            #   +------+
+                    push 1                  #   | num2 |        | num1 != num2 |
+                    ret                     #   +------+ =====> +--------------+
+                                            #   :      :        :              :
+                    eq_2:   push 0          #   :      :        :              :
+                            ret
+
+def_operator_b:     jb b_1                  #   | num1 |
+                                            #   +------+
+                    push 0                  #   | num2 |        | num1 < num2 |
+                    ret                     #   +------+ =====> +-------------+
+                                            #   :      :        :             :
+                    b_1:    push 1          #   :      :        :             :
+                            ret
+
+def_operator_a:     ja a_1                  #   | num1 |
+                                            #   +------+
+                    push 0                  #   | num2 |        | num1 > num2 |
+                    ret                     #   +------+ =====> +-------------+
+                                            #   :      :        :             :
+                    a_1:    push 1          #   :      :        :             :
+                            ret
+
+def_operator_be:    jbe be_1                #   | num1 |
+                                            #   +------+
+                    push 0                  #   | num2 |        | num1 <= num2 |
+                    ret                     #   +------+ =====> +--------------+
+                                            #   :      :        :              :
+                    be_1:   push 1          #   :      :        :              :
+                            ret
+
+def_operator_ae:    jae ae_1                #   | num1 |
+                                            #   +------+
+                    push 0                  #   | num2 |        | num1 >= num2 |
+                    ret                     #   +------+ =====> +--------------+
+                                            #   :      :        :              :
+                    ae_1:   push 1          #   :      :        :              :
+                            ret
+
+def_operator_not:   push  0                 #   | num |         | !num |
+                    je eq_3                 #   +-----+  =====> +------+
+                                            #   :     :         :      :
+                    push 0                  #   :     :         :      :
+                    ret
+                    eq_3:   push 1
+                            ret
