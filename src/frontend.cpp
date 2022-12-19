@@ -1008,7 +1008,7 @@ bool parse_if(dictionary *const name_store, const source *const code, int *const
     *token_cnt += 1;
     if (!token_char($cur_token, '{'))
     {
-        fprintf_err($cur_token.token_line, "expected '{' before \"if\" operators");
+        fprintf_err($cur_token.token_line, "expected '{' before \"if\" operators\n");
         if_err_exit
     }
     *token_cnt += 1;
@@ -1022,7 +1022,7 @@ bool parse_if(dictionary *const name_store, const source *const code, int *const
 
     if (!token_char($cur_token, '}'))
     {
-        fprintf_err($cur_token.token_line, "expected '}' after \"if\" operators");
+        fprintf_err($cur_token.token_line, "expected '}' after \"if\" operators\n");
         if_err_exit
     }
     *token_cnt += 1;
@@ -1068,7 +1068,7 @@ bool parse_else(dictionary *const name_store, const source *const code, int *con
 
     if (!token_char($cur_token, '}'))
     {
-        fprintf_err($cur_token.token_line, "expected '}' after \"else\" operators");
+        fprintf_err($cur_token.token_line, "expected '}' after \"else\" operators\n");
         else_err_exit;
     }
     *token_cnt += 1;
