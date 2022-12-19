@@ -494,7 +494,7 @@ bool execute_sqrt(machine *const computer)
 
     if (num < 0)
     {
-        fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "sqrt of less zero numer\n", "SQRT");
+        fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "sqrt of less zero number\n", "SQRT");
         return false;
     }
     num = sqrt(num);
