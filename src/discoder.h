@@ -14,7 +14,7 @@ static const char *AST_OPERATOR_TYPE_NAMES[] =
     "-"                 , // SUB
     "*"                 , // MUL
     "/"                 , // DIV
-    "^"                 , // POW
+    "KEEPER"            , // OP_SQRT
 
     "CHECK_BEGIN"       , // INPUT
     "CHECK_OVER"        , // OUTPUT
@@ -31,7 +31,7 @@ static const char *AST_OPERATOR_TYPE_NAMES[] =
     "GOAL_PLUS_ASSIST"  , // OP_AND
 
     "="                 , // ASSIGNMENT
-    "KEEPER"            , // OP_SQRT
+    "^"                 , // POW
 };
 
 static const int OP_PRIORITY[] =
@@ -41,7 +41,7 @@ static const int OP_PRIORITY[] =
     5   ,   // SUB
     6   ,   // MUL
     6   ,   // DIV
-    7   ,   // POW
+    9   ,   // SQRT
 
     0   ,   // INPUT
     0   ,   // OUTPUT
@@ -58,7 +58,7 @@ static const int OP_PRIORITY[] =
     2   ,   // OP_AND
 
     0   ,   // ASSIGNMENT
-    9   ,   // OP_SQRT
+    7   ,   // POW
 };
 
 //===========================================================================================================================

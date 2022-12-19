@@ -42,7 +42,7 @@ enum OPERATOR_TYPE
     OP_SUB          ,
     OP_MUL          ,
     OP_DIV          ,
-    OP_POW          ,
+    OP_SQRT         ,
 
     OP_INPUT        ,
     OP_OUTPUT       ,
@@ -59,7 +59,7 @@ enum OPERATOR_TYPE
     OP_AND          ,
 
     ASSIGNMENT      ,
-    OP_SQRT         ,
+    OP_POW          ,
 };
 
 static const char *OPERATOR_NAMES[] =
@@ -69,7 +69,7 @@ static const char *OPERATOR_NAMES[] =
     "sub"           ,
     "mul"           ,
     "div"           ,
-    "pow"           ,
+    "sqrt"          ,
     "input"         ,
     "output"        ,
     "equal"         ,
@@ -82,7 +82,7 @@ static const char *OPERATOR_NAMES[] =
     "or"            ,
     "and"           ,
     "assignment"    ,
-    "sqrt"          ,
+    "pow"           ,
 };
 
 static const char *MAIN_FUNCTION = "CAMP_NOU";
