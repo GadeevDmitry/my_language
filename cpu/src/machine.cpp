@@ -60,6 +60,8 @@ bool execute(machine *const computer)
             case POW : if (execute_pow  (computer) == false) { machine_dtor(computer); return false; } break;
             case SQRT: if (execute_sqrt (computer) == false) { machine_dtor(computer); return false; } break;
             case SIN : if (execute_sin  (computer) == false) { machine_dtor(computer); return false; } break;
+            case COS : if (execute_cos  (computer) == false) { machine_dtor(computer); return false; } break;
+            case LOG : if (execute_log  (computer) == false) { machine_dtor(computer); return false; } break;
 
             case CALL: if (execute_call (computer) == false) { machine_dtor(computer); return false; } break;
             case JMP :
@@ -126,8 +128,8 @@ bool execute_param(machine *const computer, const unsigned char cmd)
         case PUSH: return execute_push(computer, cmd);
         case POP : return execute_pop (computer, cmd);
 
-        default  : log_error(         "default case in execute_param(): cmd=%d(%d)\n", cmd, __LINE__);
-                   assert   (false && "default case in execute_param()");
+        default  : fprintf(stderr, TERMINAL_RED "RUNTIME ERROR: " TERMINAL_CANCEL "undefined command\n");
+                   log_error("default case in execute_param(): cmd=%d(%d)\n", cmd, __LINE__);
                    break;
     }
     return false;
@@ -515,6 +517,42 @@ bool execute_sin(machine *const computer)
     stack_push(&$data_stack, &num);
     return true;
 }
+
+bool execute_cos(machine *const computer)
+{
+    assert(computer != nullptr);
+
+    cpu_type num = 0;
+
+    check_empty(data_stack, COS);
+    num = *(cpu_type *) stack_pop(&$data_stack);
+
+    num = cos(num);
+    stack_push(&$data_stack, &num);
+
+    return true;
+}
+
+bool execute_log(machine *const computer)
+{
+    assert(computer != nullptr);
+
+    cpu_type num = 0;
+
+    check_empty(data_stack, LOG);
+    num = *(cpu_type *) stack_pop(&$data_stack);
+
+    if (num < 0 || approx_equal(num, 0))
+    {
+        fprintf(stderr, "%-5s" TERMINAL_RED " RUNTIME ERROR: " TERMINAL_CANCEL "log of less zero number\n", "LOG");
+        return false;
+    }
+    num = log(num);
+    stack_push(&$data_stack, &num);
+
+    return true;
+}
+
 /*===========================================================================================================================*/
 // MACHINE_CTOR_DTOR
 /*===========================================================================================================================*/

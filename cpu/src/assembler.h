@@ -89,6 +89,8 @@ static const char *ASM_CMD_NAMES[] =
     "POW"           ,
     "SQRT"          ,
     "SIN"           ,
+    "COS"           ,
+    "LOG"           ,
 
     "UNDEF_ASM_CMD" ,
 };

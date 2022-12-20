@@ -1713,6 +1713,15 @@ bool parse_unary_op(dictionary *const name_store, const source *const code, int 
     if (*unary_op != nullptr)                               return  true;
 
     if (!parse_sin (name_store, code, token_cnt, unary_op)) return false;
+    if (*unary_op != nullptr)                               return  true;
+
+    if (!parse_cos (name_store, code, token_cnt, unary_op)) return false;
+    if (*unary_op != nullptr)                               return  true;
+
+    if (!parse_diff(name_store, code, token_cnt, unary_op)) return false;
+    if (*unary_op != nullptr)                               return  true;
+
+    if (!parse_ln  (name_store, code, token_cnt, unary_op)) return false;
     return true;
 }
 //--------------------------------------------------------------------------------------------------------------------------
@@ -1757,7 +1766,7 @@ bool parse_sqrt(dictionary *const name_store, const source *const code, int *con
     return true;
 }
 #undef sqrt_err_exit
-
+//--------------------------------------------------------------------------------------------------------------------------
 #define sin_err_exit                                                                                                        \
         AST_tree_dtor(*sin_op);                                                                                             \
         *sin_op = nullptr;                                                                                                  \
@@ -1799,6 +1808,132 @@ bool parse_sin(dictionary *const name_store, const source *const code, int *cons
     return true;
 }
 #undef sin_err_exit
+//--------------------------------------------------------------------------------------------------------------------------
+#define cos_err_exit                                                                                                        \
+        AST_tree_dtor(*cos_op);                                                                                             \
+        *cos_op = nullptr;                                                                                                  \
+        *token_cnt = old_token_cnt;                                                                                         \
+        return false;
+
+bool parse_cos(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const cos_op)
+{
+    assert(name_store != nullptr);
+    assert(code       != nullptr);
+    assert(token_cnt  != nullptr);
+    assert(cos_op     != nullptr);
+    assert(*cos_op    == nullptr);
+
+    const int old_token_cnt = *token_cnt;
+
+    if (!token_cos($cur_token)) return true;
+
+    *token_cnt += 1;
+    if (!token_char($cur_token, '('))
+    {
+        fprintf_err($cur_token.token_line, "expected '(' before cos operand\n");
+        cos_err_exit
+    }
+    *token_cnt += 1;
+    AST_node *subtree = nullptr;
+
+    if (!parse_rvalue(name_store, code, token_cnt, &subtree)) { cos_err_exit }
+
+    *cos_op = new_OPERATOR_AST_node(OP_COS, subtree);
+    subtree = nullptr;
+
+    if (!token_char($cur_token, ')'))
+    {
+        fprintf_err($cur_token.token_line, "expected ')' after cos operand\n");
+        cos_err_exit
+    }
+    *token_cnt += 1;
+    return true;
+}
+#undef cos_err_exit
+//--------------------------------------------------------------------------------------------------------------------------
+#define diff_err_exit                                                                                                       \
+        AST_tree_dtor(*diff_op);                                                                                            \
+        *diff_op = nullptr;                                                                                                 \
+        *token_cnt = old_token_cnt;                                                                                         \
+        return false;
+
+bool parse_diff(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const diff_op)
+{
+    assert(name_store != nullptr);
+    assert(code       != nullptr);
+    assert(token_cnt  != nullptr);
+    assert(diff_op    != nullptr);
+    assert(*diff_op   == nullptr);
+
+    const int old_token_cnt = *token_cnt;
+
+    if (!token_diff($cur_token)) return true;
+
+    *token_cnt += 1;
+    if (!token_char($cur_token, '('))
+    {
+        fprintf_err($cur_token.token_line, "expected '(' before cos operand\n");
+        diff_err_exit
+    }
+    *token_cnt += 1;
+    AST_node *subtree = nullptr;
+
+    if (!parse_rvalue(name_store, code, token_cnt, &subtree)) { diff_err_exit }
+
+    *diff_op = new_OPERATOR_AST_node(OP_DIFF, subtree);
+    subtree = nullptr;
+
+    if (!token_char($cur_token, ')'))
+    {
+        fprintf_err($cur_token.token_line, "expected ')' after cos operand\n");
+        diff_err_exit
+    }
+    *token_cnt += 1;
+    return true;
+}
+#undef diff_err_exit
+//--------------------------------------------------------------------------------------------------------------------------
+#define ln_err_exit                                                                                                         \
+        AST_tree_dtor(*ln_op);                                                                                              \
+        *ln_op = nullptr;                                                                                                   \
+        *token_cnt = old_token_cnt;                                                                                         \
+        return false;
+
+bool parse_ln(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const ln_op)
+{
+    assert(name_store != nullptr);
+    assert(code       != nullptr);
+    assert(token_cnt  != nullptr);
+    assert(ln_op      != nullptr);
+    assert(*ln_op     == nullptr);
+
+    const int old_token_cnt = *token_cnt;
+
+    if (!token_ln($cur_token)) return true;
+
+    *token_cnt += 1;
+    if (!token_char($cur_token, '('))
+    {
+        fprintf_err($cur_token.token_line, "expected '(' before cos operand\n");
+        ln_err_exit
+    }
+    *token_cnt += 1;
+    AST_node *subtree = nullptr;
+
+    if (!parse_rvalue(name_store, code, token_cnt, &subtree)) { ln_err_exit }
+
+    *ln_op = new_OPERATOR_AST_node(OP_LOG, subtree);
+    subtree = nullptr;
+
+    if (!token_char($cur_token, ')'))
+    {
+        fprintf_err($cur_token.token_line, "expected ')' after cos operand\n");
+        ln_err_exit
+    }
+    *token_cnt += 1;
+    return true;
+}
+#undef diff_err_exit
 //--------------------------------------------------------------------------------------------------------------------------
 bool parse_rvalue_token(dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const subtree)
 {
@@ -1890,6 +2025,9 @@ bool token_input  (const token cur_token) { return cur_token.type == KEY_WORD &&
 bool token_output (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == OUTPUT; }
 bool token_sqrt   (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == SQRT  ; }
 bool token_sin    (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == SIN   ; }
+bool token_cos    (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == COS   ; }
+bool token_diff   (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == DIFF  ; }
+bool token_ln     (const token cur_token) { return cur_token.type == KEY_WORD && cur_token.key_word_val == LN    ; }
 
 bool token_e      (const token cur_token) { return cur_token.type == KEY_CHAR_DOUBLE && cur_token.key_dbl_char_val == EQUAL      ; }
 bool token_ne     (const token cur_token) { return cur_token.type == KEY_CHAR_DOUBLE && cur_token.key_dbl_char_val == NOT_EQUAL  ; }

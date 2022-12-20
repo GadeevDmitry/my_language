@@ -67,6 +67,9 @@ static const char *KEY_WORD_NAMES[]   =
     "CHECK_OVER"        ,   // output
     "KEEPER"            ,   // sqrt
     "LEFT_CORNER"       ,   // sin
+    "RIGHT_CORNER"      ,   // cos
+    "PENALTY"           ,   // diff
+    "FREE_KICK"         ,   // ln
 };
 enum KEY_WORD_TYPE
 {
@@ -79,6 +82,9 @@ enum KEY_WORD_TYPE
     OUTPUT  ,
     SQRT    ,
     SIN     ,
+    COS     ,
+    DIFF    ,
+    LN      ,
 };
 
 static const char *KEY_CHAR_DOUBLE_NAMES[] = 
@@ -301,8 +307,8 @@ void dictionary_dtor (dictionary *const name_store);
 
 AST_node *parse_general(const source *const code, dictionary *const name_store_ptr);
 
-bool parse_var_decl         (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         subtree);
-bool parse_func_decl        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         subtree);
+bool parse_var_decl         (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
+bool parse_func_decl        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
 bool parse_func_args        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         arg_tree);
 
 bool parse_operators        (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          op_tree);
@@ -334,6 +340,9 @@ bool parse_operand          (dictionary *const name_store, const source *const c
 bool parse_unary_op         (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const         unary_op);
 bool parse_sqrt             (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          sqrt_op);
 bool parse_sin              (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const           sin_op);
+bool parse_cos              (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const           cos_op);
+bool parse_diff             (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          diff_op);
+bool parse_ln               (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const            ln_op);
 
 bool parse_rvalue_token     (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
 bool parse_lvalue           (dictionary *const name_store, const source *const code, int *const token_cnt, AST_node **const          subtree);
@@ -359,6 +368,9 @@ bool token_input  (const token cur_token);
 bool token_output (const token cur_token);
 bool token_sqrt   (const token cur_token);
 bool token_sin    (const token cur_token);
+bool token_cos    (const token cur_token);
+bool token_diff   (const token cur_token);
+bool token_ln     (const token cur_token);
 
 bool token_e      (const token cur_token);
 bool token_ne     (const token cur_token);

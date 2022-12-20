@@ -42,8 +42,14 @@ int main(const int argc, const char *argv[])
         return 0;
     }
     AST_tree_graphviz_dump(tree);
-    optimize_ast(tree);
+    
+    optimize_const_ast(tree);
+    optimize_diff_ast (tree);
+    optimize_const_ast(tree);
+
     AST_tree_graphviz_dump(tree);
+
+    fprintf(stderr, TERMINAL_GREEN "middleend success\n" TERMINAL_CANCEL);
 
     FILE *stream = fopen(argv[1], "w");
 
@@ -60,12 +66,12 @@ int main(const int argc, const char *argv[])
 // OPTIMIZE
 //===========================================================================================================================
 
-void optimize_ast(AST_node *const node)
+void optimize_const_ast(AST_node *const node)
 {
     if (node == nullptr) return;
 
-    optimize_ast(L);
-    optimize_ast(R);
+    optimize_const_ast(L);
+    optimize_const_ast(R);
 
     if ($type != OPERATOR) return;
 
@@ -88,13 +94,16 @@ void optimize_ast(AST_node *const node)
         case OP_AND        : optimize_and(node); break;
 
         case OP_SIN        : optimize_sin (node); break;
+        case OP_COS        : optimize_cos (node); break;
+        case OP_LOG        : optimize_ln  (node); break;
         case OP_SQRT       : optimize_sqrt(node); break;
         case OP_NOT        : optimize_not (node); break;
 
         case OP_INPUT      :
         case OP_OUTPUT     :
-        case ASSIGNMENT    : break;
-        default            : assert(false && "default case in optimize_ast()"); return;
+        case ASSIGNMENT    :
+        case OP_DIFF       : break;
+        default            : assert(false && "default case in optimize_const_ast()"); return;
     }
 
     return;
@@ -292,6 +301,40 @@ void optimize_sin(AST_node *const node)
     AST_node_NUMBER_ctor(node, sin(l_op), nullptr, nullptr, P);
 }
 
+void optimize_cos(AST_node *const node)
+{
+    assert(node     != nullptr);
+    assert($type    == OPERATOR);
+    assert($op_type == OP_COS);
+
+    if (L->type != NUMBER) return;
+
+    const double l_op = L->value.dbl_num;
+
+    AST_tree_dtor(L);
+    AST_tree_dtor(R);
+
+    AST_node_NUMBER_ctor(node, cos(l_op), nullptr, nullptr, P);
+}
+
+void optimize_ln(AST_node *const node)
+{
+    assert(node     != nullptr);
+    assert($type    == OPERATOR);
+    assert($op_type == OP_LOG);
+
+    if (L->type != NUMBER) return;
+
+    const double l_op = L->value.dbl_num;
+
+    if (l_op < 0 || approx_equal(l_op, 0)) return;
+
+    AST_tree_dtor(L);
+    AST_tree_dtor(R);
+
+    AST_node_NUMBER_ctor(node, log(l_op), nullptr, nullptr, P);
+}
+
 void optimize_not(AST_node *const node)
 {
     assert(node     != nullptr);
@@ -306,6 +349,133 @@ void optimize_not(AST_node *const node)
     AST_tree_dtor(R);
 
     AST_node_NUMBER_ctor(node, approx_equal(l_op, 0), nullptr, nullptr, P);
+}
+//---------------------------------------------------------------------------------------------------------------------------
+
+bool optimize_diff_ast(AST_node *const node)
+{
+    if (node == nullptr) return true;
+
+    if (!optimize_diff_ast(L)) return false;
+    if (!optimize_diff_ast(R)) return false;
+
+    if (!($type == OPERATOR && $op_type == OP_DIFF)) return true;
+
+    optimize_const_ast(L);
+    AST_node *diff = diff_do(L);
+    optimize_const_ast(diff);
+
+    if (P == nullptr)
+    {
+        AST_tree_dtor(diff);
+        fprintf_err("the root of ast can't be \"OPERATOR\" type");
+        return false;
+    }
+    if (P->left == node) P->left  = diff;
+    else                 P->right = diff;
+
+    diff->prev = P;
+    AST_tree_dtor(node);
+
+    return true;
+}
+
+AST_node *diff_do(const AST_node *const node)
+{
+    assert(node != nullptr);
+
+    switch ($type)
+    {
+        case NUMBER    :
+        case FUNC_CALL : return Null;
+        case VARIABLE  : return One ;
+        case OPERATOR  : return diff_op(node);
+        case FICTIONAL :
+        case OP_IF     :
+        case IF_ELSE   :
+        case OP_WHILE  :
+        case VAR_DECL  :
+        case FUNC_DECL :
+        case OP_RETURN :
+        default        : assert(false && "default case in diff_do()"); return nullptr;
+    }
+    return nullptr;
+}
+
+AST_node *diff_op(const AST_node *const node)
+{
+    assert(node  != nullptr);
+    assert($type == OPERATOR);
+
+    switch ($op_type)
+    {
+        case OP_ADD        : return Add   (dL, dR);
+        case OP_SUB        : return Sub   (dL, dR);
+        case OP_MUL        : return Add   (Mul(dL, cR), Mul(cL, dR));
+        case OP_DIV        : return Div   (Sub(Mul(dL, cR), Mul(cL, dR)), Pow(cR, Two));
+        case OP_SQRT       : return Div   (dL, Mul(Two, Sqrt(cL)));
+
+        case OP_EQUAL      : return Equal (dL, dR);
+        case OP_ABOVE      : return Above (dL, dR);
+        case OP_BELOW      : return Below (dL, dR);
+        case OP_ABOVE_EQUAL: return A_eq  (dL, dR);
+        case OP_BELOW_EQUAL: return B_eq  (dL, dR);
+        case OP_NOT_EQUAL  : return N_eq  (dL, dR);
+        case OP_NOT        : return Not   (dL, dR);
+
+        case OP_OR         : return Or    (dL, dR);
+        case OP_AND        : return And   (dL, dR);
+
+        case ASSIGNMENT    : return Assign(cL, dR);
+        case OP_POW        : return diff_pow(node);
+        case OP_SIN        : return Mul(Cos(cL), dL);
+        case OP_COS        : return Mul(Mul(Sin(cL), dL), Sub_One);
+        case OP_LOG        : return Div(dL, cL);
+
+        case OP_DIFF       : assert(false && "OP_DIFF case in diff_op()"); return nullptr;
+        default            : assert(false && "default case in diff_op()"); return nullptr;
+    }
+    return nullptr;
+}
+
+AST_node *diff_pow(const AST_node *const node)
+{
+    assert(node     != nullptr);
+    assert($type    == OPERATOR);
+    assert($op_type == OP_POW);
+
+    if (L->type == NUMBER) return Mul(Pow(cL, cR), Mul(Ln(cL), dR));
+    if (R->type == NUMBER)
+    {
+        AST_node *power = new_NUMBER_AST_node(R->value.dbl_num - 1);
+
+        return Mul(Pow(cL, power), Mul(cR, dL));
+    }
+    return Mul(Pow(cL, cR), Add(Div(Mul(cR, dL), cL), Mul(dR, Ln(cL))));
+}
+
+AST_node *AST_node_dup(const AST_node *const node)
+{
+    if (node == nullptr) return nullptr;
+
+    switch ($type)
+    {
+        case FICTIONAL : return new_FICTIONAL_AST_node(0          , AST_node_dup(L), AST_node_dup(R));
+        case NUMBER    : return new_NUMBER_AST_node   ($dbl_num   , AST_node_dup(L), AST_node_dup(R));
+        case VARIABLE  : return new_VARIABLE_AST_node (0          , AST_node_dup(L), AST_node_dup(R));
+        case OP_IF     : return new_OP_IF_AST_node    (0          , AST_node_dup(L), AST_node_dup(R));
+        case IF_ELSE   : return new_IF_ELSE_AST_node  (0          , AST_node_dup(L), AST_node_dup(R));
+        case OP_WHILE  : return new_OP_WHILE_AST_node (0          , AST_node_dup(L), AST_node_dup(R));
+        case OPERATOR  : return new_OPERATOR_AST_node ($op_type   , AST_node_dup(L), AST_node_dup(R));
+        case VAR_DECL  : return new_VAR_DECL_AST_node ($var_index , AST_node_dup(L), AST_node_dup(R));
+        case FUNC_DECL : return new_FUNC_DECL_AST_node($func_index, AST_node_dup(L), AST_node_dup(R));
+        case FUNC_CALL : return new_FUNC_CALL_AST_node($func_index, AST_node_dup(L), AST_node_dup(R));
+        case OP_RETURN : return new_OP_RETURN_AST_node(0          , AST_node_dup(L), AST_node_dup(R));
+
+        default        : assert(false && "default case in AST_node_dup()");
+                         break;
+    }
+    return nullptr;
 }
 
 //===========================================================================================================================

@@ -281,6 +281,9 @@ bool translate_operator(const AST_node *const node, FILE *const stream, const na
 
         case OP_NOT        :
         case OP_SIN        :
+        case OP_COS        :
+        case OP_DIFF       :
+        case OP_LOG        :
         case OP_SQRT       : return translate_closed_unary_operator (node, stream, var_store, func_store, tab_shift, independent_op);
 
         case ASSIGNMENT    : return  translate_assignment           (node, stream, var_store, func_store, tab_shift, independent_op);

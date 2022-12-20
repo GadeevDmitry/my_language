@@ -33,6 +33,9 @@ static const char *AST_OPERATOR_TYPE_NAMES[] =
     "="                 , // ASSIGNMENT
     "^"                 , // POW
     "LEFT_CORNER"       , // SIN
+    "RIGHT_CORNER"      , // COS
+    "PENALTY"           , // DIFF
+    "FREE_KICK"         , // LN
 };
 
 static const int OP_PRIORITY[] =
@@ -61,6 +64,9 @@ static const int OP_PRIORITY[] =
     0   ,   // ASSIGNMENT
     7   ,   // POW
     9   ,   // SIN
+    9   ,   // COS
+    9   ,   // DIFF
+    9   ,   // LN
 };
 
 //===========================================================================================================================

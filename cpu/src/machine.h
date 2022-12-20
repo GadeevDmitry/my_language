@@ -71,6 +71,8 @@ bool execute_div               (machine *const computer);
 bool execute_pow               (machine *const computer);
 bool execute_sqrt              (machine *const computer);
 bool execute_sin               (machine *const computer);
+bool execute_cos               (machine *const computer);
+bool execute_log               (machine *const computer);
 
 /*===========================================================================================================================*/
 // MACHINE_CTOR_DTOR
